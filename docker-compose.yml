@@ -1,0 +1,10 @@
+services:
+  web:
+    image: ghcr.io/YOUR_GH_USERNAME/inventree-uploader:latest  # Route 1 (CI-built)
+    # OR use "build: ." for Route 2 if Portainer should build from this repo
+    restart: unless-stopped
+    environment:
+      INVENTREE_URL: ${INVENTREE_URL}
+      INVENTREE_TOKEN: ${INVENTREE_TOKEN}
+    ports:
+      - "8000:8000"
