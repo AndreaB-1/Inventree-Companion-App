@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>InvenTree Photo Upload</title>
+  <style>
+    :root{
+      --bg:#0b0c0f; --card:#12141a; --muted:#9aa3b2; --text:#e7e9ee; --line:#20242e;
+      --accent:#4f46e5; --accent-2:#22c55e; --danger:#ef4444;
+      --pad:14px; --radius:16px; --maxw:820px; --shadow:0 10px 30px rgba(0,0,0,.35);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#f6f7fb; --card:#fff; --muted:#5a6473; --text:#0b0c0f; --line:#e9edf2; --shadow:0 6px 24px rgba(0,0,0,.08); }
+    }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; height:100%; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial; }
+    .wrap{ max-width:var(--maxw); margin:0 auto; padding:16px 16px 90px; }
+    header{
+      position:sticky; top:0; z-index:30; backdrop-filter:saturate(180%) blur(10px);
+      background:color-mix(in oklab, var(--bg) 85%, transparent);
+      border-bottom:1px solid var(--line);
+    }
+    .h-row{ max-width:var(--maxw); margin:0 auto; padding:12px 16px; display:flex; align-items:center; gap:12px; }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px; }
+    .brand svg{ width:28px; height:28px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:var(--pad); box-shadow:var(--shadow); }
+    .card + .card{ margin-top:14px; }
+    .title{ margin:0 0 8px; font-size:1.05rem; font-weight:700; letter-spacing:.2px; }
+    .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .col{ display:flex; flex-direction:column; gap:8px; }
+
+    input,button{ font:inherit; border-radius:12px; border:1px solid var(--line); padding:12px 14px; background:#0f1116; color:var(--text); }
+    @media (prefers-color-scheme: light){ input,button{ background:#fff; } }
+    input::placeholder{ color:var(--muted); }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:12px 14px; border-radius:12px; border:1px solid var(--line); cursor:pointer; }
+    .btn-primary{ background:var(--accent); color:white; border-color:transparent; }
+    .btn-success{ background:var(--accent-2); color:#08140b; border-color:transparent; }
+    .muted{ color:var(--muted); font-size:.95rem; }
+
+    .dropdown{ position:absolute; top:44px; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); display:none; max-height:280px; overflow:auto; z-index:20; }
+    .dd-item{ padding:10px 12px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .dd-item:hover, .dd-item.active{ background:color-mix(in oklab, var(--card) 80%, var(--bg)); }
+    .dd-sub{ color:var(--muted); font-size:.9rem; }
+
+    video, canvas{ width:100%; border-radius:12px; border:1px solid var(--line); background:#000; }
+    #cropCanvas{ aspect-ratio:1/1; max-width:min(92vw, 460px); margin-inline:auto; display:block; touch-action:none; }
+
+    .toolbar{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:10px; }
+    .toolbar .btn{ padding:10px 12px; }
+
+    .sticky-bar{ position:fixed; left:0; right:0; bottom:0; z-index:40; background:color-mix(in oklab, var(--card) 88%, transparent); border-top:1px solid var(--line); backdrop-filter:saturate(180%) blur(10px); padding:10px 14px calc(10px + var(--safe-bottom)); }
+    .sb-row{ max-width:var(--maxw); margin:0 auto; display:flex; gap:10px; align-items:center; }
+    .status{ min-height:24px; color:var(--muted); }
+    .nudge{ display:inline-grid; grid-template-columns:repeat(3,36px); grid-auto-rows:36px; gap:6px; align-items:center; justify-items:center; }
+    .nudge button{ width:36px; height:36px; line-height:0; padding:0; }
+
+    .muted-small{ color:var(--muted); font-size:.85rem; text-align:center; margin-top:6px; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="h-row">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      InvenTree Uploader
+    </div>
+    <div style="flex:1"></div>
+    <span class="muted">Mobile ready</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- SELECT PART -->
+  <section class="card">
+    <h3 class="title">1) Select Part</h3>
+    <div class="row" style="position:relative;">
+      <div style="position:relative; flex:1; min-width:240px;">
+        <input id="partSearch" placeholder="Search by Name / IPN, or type an ID…" autocomplete="off" />
+        <input id="partIdHidden" type="hidden" />
+        <div id="partList" class="dropdown"></div>
+      </div>
+      <button id="scanPhoto" class="btn">Scan by Photo</button>
+      <input type="file" id="qrFile" accept="image/*" capture="environment" style="display:none;">
+      <button id="lookup" class="btn btn-primary">Use</button>
+    </div>
+    <div id="partInfo" class="muted" style="margin-top:8px;">No part selected.</div>
+  </section>
+
+  <!-- ADD PART -->
+  <section class="card">
+    <h3 class="title">Add New Part</h3>
+    <div class="row" style="gap:12px; align-items:flex-start;">
+      <div class="col" style="flex:1; min-width:240px;">
+        <input id="newName" placeholder="Name (required)" />
+        <input id="newIPN" placeholder="IPN (optional)" />
+        <input id="newDesc" placeholder="Description (optional)" />
+      </div>
+      <div class="col" style="flex:1; min-width:240px;">
+        <div style="position:relative;">
+          <input id="locSearch" placeholder="Search Location…" autocomplete="off" />
+          <input id="newLoc" type="hidden" />
+          <div id="locList" class="dropdown"></div>
+        </div>
+        <input id="newQty" type="number" step="0.01" placeholder="Initial Qty (optional)" />
+        <button id="createPart" class="btn btn-success">Create & Select</button>
+      </div>
+    </div>
+    <div id="createStatus" class="muted" style="margin-top:8px;"></div>
+  </section>
+
+  <!-- IMAGE -->
+  <section class="card">
+    <h3 class="title">2) Image</h3>
+    <div class="row">
+      <input type="file" id="fileInput" accept="image/*" capture="environment" />
+      <span class="muted">Tip: on mobile, the file picker opens the camera.</span>
+    </div>
+
+    <div style="margin-top:12px;">
+      <canvas id="cropCanvas" width="320" height="320"></canvas>
+
+      <div class="toolbar">
+        <button class="btn" id="centerBtn">Center</button>
+        <button class="btn" id="resetBtn">Reset</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="nudge">
+          <span></span><button class="btn" id="nudgeUp">▲</button><span></span>
+          <button class="btn" id="nudgeLeft">◀</button><span></span><button class="btn" id="nudgeRight">▶</button>
+          <span></span><button class="btn" id="nudgeDown">▼</button><span></span>
+        </div>
+      </div>
+
+      <div class="muted-small">Gestures: one finger = pan • two fingers = pinch-zoom • double-tap = reset</div>
+    </div>
+  </section>
+</main>
+
+<!-- STICKY UPLOAD BAR -->
+<div class="sticky-bar">
+  <div class="sb-row">
+    <div class="status" id="status">Pick a part and image to enable Upload.</div>
+    <button id="upload" class="btn btn-primary" disabled>Upload</button>
+  </div>
+</div>
+
+<script>
+/* ===== Helpers & state ===== */
+const $ = s => document.querySelector(s);
+const partInfo = $('#partInfo');
+const statusEl = $('#status');
+
+const state = {
+  partId:null, partName:null,
+  img:null, imgW:0, imgH:0,
+  zoom:1, pan:{x:0.5, y:0.5}  // pan is in image-fraction coords (0..1)
+};
+
+function setPart(p){
+  state.partId = String(p.pk); state.partName = p.name || '';
+  partInfo.innerHTML = `Selected: <span style="padding:6px 10px;border:1px solid var(--line);border-radius:999px;display:inline-block;">[${state.partId}] ${state.partName}${p.ipn ? ' • ' + p.ipn : ''}</span>`;
+  $('#partSearch').value = `${p.name || ''}${p.ipn ? ' • ' + p.ipn : ''} [${p.pk}]`.trim();
+  $('#partIdHidden').value = String(p.pk);
+  updateUploadEnabled();
+}
+function updateUploadEnabled(){
+  const ready = !!(state.partId && state.img);
+  $('#upload').disabled = !ready;
+  if (!ready) statusEl.textContent = 'Pick a part and image to enable Upload.';
+}
+function clamp(min, max, v){ return Math.max(min, Math.min(max, v)); }
+function clamp01(v){ return clamp(0,1,v); }
+
+/* ===== Part & location search ===== */
+async function api(path){ const r=await fetch(path); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+
+const partInput = $('#partSearch'), partList = $('#partList'), partHidden = $('#partIdHidden');
+let partDebounce, partActive=-1, partItems=[];
+function hide(el){ el.style.display='none'; } function show(el){ el.style.display='block'; }
+function renderParts(items){
+  partItems = items||[]; partList.innerHTML='';
+  if(!partItems.length){ hide(partList); partActive=-1; return; }
+  for(let i=0;i<items.length;i++){
+    const it=items[i], d=document.createElement('div'); d.className='dd-item'+(i===partActive?' active':'');
+    const left=document.createElement('div'); left.textContent = `${it.name||''}`;
+    const right=document.createElement('div'); right.className='dd-sub'; right.textContent = `${it.ipn? 'IPN '+it.ipn+' • ' : ''}#${it.pk}`;
+    d.appendChild(left); d.appendChild(right); d.onclick=()=>{ setPart(it); hide(partList); }; partList.appendChild(d);
+  }
+  show(partList);
+}
+async function searchParts(q){ return api('/api/parts?q='+encodeURIComponent(q||'')); }
+partInput.addEventListener('input', ()=>{
+  partHidden.value=''; const q=partInput.value.trim(); clearTimeout(partDebounce);
+  if(!q){ hide(partList); return; }
+  partDebounce=setTimeout(async()=>{ try{ renderParts(await searchParts(q)); }catch{ hide(partList); } }, 200);
+});
+partInput.addEventListener('focus', async ()=>{
+  const q=partInput.value.trim(); if(!q) return; try{ renderParts(await searchParts(q)); }catch{}
+});
+document.addEventListener('click', (e)=>{ if(!partList.contains(e.target) && e.target!==partInput) hide(partList); });
+$('#lookup').onclick = async ()=>{
+  const typed = partInput.value.trim(), hiddenId = partHidden.value.trim();
+  if(hiddenId){ setPart({ pk:hiddenId, name:typed }); return; }
+  if(/^\d+$/.test(typed)){ try{ setPart(await api('/api/part/by-id?pk='+encodeURIComponent(typed))); return; }catch{} }
+  try{ const items = await searchParts(typed); if(items.length){ setPart(items[0]); return; } }catch{}
+  partInfo.textContent='No part found.';
+};
+
+const locInput = $('#locSearch'), locList = $('#locList'), locHidden = $('#newLoc');
+let locDebounce;
+function renderLocs(items){
+  locList.innerHTML=''; if(!items.length){ hide(locList); return; }
+  for(const it of items){ const d=document.createElement('div'); d.className='dd-item'; d.textContent=it.path||it.name; d.onclick=()=>{ locHidden.value=String(it.pk); locInput.value=it.path||it.name; hide(locList); }; locList.appendChild(d); }
+  show(locList);
+}
+async function searchLocations(q){ return api('/api/locations?q='+encodeURIComponent(q||'')); }
+locInput.addEventListener('input', ()=>{
+  locHidden.value=''; const q=locInput.value.trim(); clearTimeout(locDebounce);
+  if(!q){ hide(locList); return; }
+  locDebounce=setTimeout(async()=>{ try{ renderLocs(await searchLocations(q)); }catch{ hide(locList);} }, 200);
+});
+locInput.addEventListener('focus', async ()=>{ if(!locInput.value.trim()) return; try{ renderLocs(await searchLocations(locInput.value.trim())); }catch{}; });
+document.addEventListener('click', (e)=>{ if(!locList.contains(e.target) && e.target!==locInput) hide(locList); });
+
+$('#createPart').onclick = async ()=>{
+  const name=$('#newName').value.trim(), ipn=$('#newIPN').value.trim(), desc=$('#newDesc').value.trim(), qty=$('#newQty').value.trim();
+  const locPk = $('#newLoc').value.trim() || (/^\d+$/.test(locInput.value.trim())? locInput.value.trim() : '');
+  const status=$('#createStatus');
+  if(!name){ status.textContent='Name is required.'; return; }
+  const fd=new FormData(); fd.append('name',name);
+  if(ipn) fd.append('ipn', ipn); if(desc) fd.append('description', desc); if(qty) fd.append('initial_qty', qty); if(locPk) fd.append('location_id', locPk);
+  status.textContent='Creating...';
+  try{
+    const r=await fetch('/api/part/create',{ method:'POST', body:fd }); const j=await r.json();
+    if(!r.ok) throw new Error(j.detail || 'Create failed');
+    status.textContent='✅ '+(j.message || 'Part created.'); setPart({pk:j.pk, name:j.name, ipn});
+  }catch(e){ status.textContent='❌ '+e.message; }
+};
+
+/* ===== QR "scan by photo" ===== */
+$('#scanPhoto').onclick = ()=> $('#qrFile').click();
+$('#qrFile').onchange = async (e)=>{
+  const file = e.target.files[0]; if(!file) return; const fd = new FormData(); fd.append('image', file, 'qr.jpg');
+  try{
+    const r = await fetch('/api/decode_qr', { method:'POST', body: fd }); const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || 'QR decode failed');
+    let val=null;
+    if (j.payload && typeof j.payload==='object' && ('part' in j.payload)) val=String(j.payload.part);
+    else if (j.text) {
+      const m = j.text.match(/(?:\?|#|&)(?:part|id|ipn)=([^&]+)/i);
+      if (m) val = decodeURIComponent(m[1]); else if (/^\d+$/.test(j.text.trim())) val=j.text.trim();
+    }
+    if(!val) throw new Error('QR did not contain a recognizable part');
+    if(/^\d+$/.test(val)){ try{ setPart(await api('/api/part/by-id?pk='+encodeURIComponent(val))); return; }catch{} }
+    const items = await searchParts(val); if(items.length){ setPart(items[0]); return; }
+    throw new Error('Part not found');
+  }catch(err){ statusEl.textContent = 'QR error: ' + (err.message || 'failed'); }
+  finally{ e.target.value=''; }
+};
+
+/* ===== Cropper: PAN + PINCH ZOOM (no rotation) ===== */
+const canvas = $('#cropCanvas'), ctx = canvas.getContext('2d', { alpha:false });
+
+$('#fileInput').onchange = e => {
+  const f=e.target.files[0]; if(!f) return;
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = ()=>{ URL.revokeObjectURL(url); setImage(img); };
+  img.src = url;
+};
+
+function setImage(img){
+  state.img = img; state.imgW = img.naturalWidth || img.width; state.imgH = img.naturalHeight || img.height;
+  state.pan = { x:0.5, y:0.5 }; state.zoom = 1;
+  draw();
+  updateUploadEnabled();
+}
+
+function draw(){
+  const can = canvas, c = ctx;
+  c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,can.width,can.height);
+  if(!state.img) return;
+
+  // Square crop size in image pixels
+  const minSide = Math.min(state.imgW, state.imgH);
+  const cropSizeImg = minSide / state.zoom;
+  const half = cropSizeImg / 2;
+
+  // Clamp center so the crop stays inside the image
+  const cx = clamp(half, state.imgW - half, state.pan.x * state.imgW);
+  const cy = clamp(half, state.imgH - half, state.pan.y * state.imgH);
+  state.pan.x = cx / state.imgW;
+  state.pan.y = cy / state.imgH;
+
+  const left = cx - half;
+  const top  = cy - half;
+
+  // Draw source square directly to canvas (no rotation)
+  c.drawImage(state.img, left, top, cropSizeImg, cropSizeImg, 0, 0, can.width, can.height);
+
+  // Frame
+  c.strokeStyle = '#ffffff55'; c.lineWidth = 2; c.strokeRect(1,1,can.width-2,can.height-2);
+}
+
+/* Pointer gestures */
+const active = new Map(); // pointerId -> {x,y}
+let gesture = null;
+
+canvas.addEventListener('pointerdown', e=>{
+  canvas.setPointerCapture(e.pointerId);
+  active.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if(active.size === 1){
+    gesture = { type:'pan', startPan:{...state.pan}, start:{...active.get(e.pointerId)} };
+  } else if(active.size === 2){
+    const pts = Array.from(active.values());
+    gesture = {
+      type:'pinch',
+      startPan:{...state.pan},
+      startZoom: state.zoom,
+      startMid: mid(pts[0], pts[1]),
+      startDist: dist(pts[0], pts[1])
+    };
+  }
+});
+
+canvas.addEventListener('pointermove', e=>{
+  if(!active.has(e.pointerId)) return;
+  active.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if(!gesture) return;
+
+  const minSide = Math.min(state.imgW, state.imgH);
+  if(gesture.type === 'pan' && active.size === 1){
+    const cur = active.get(e.pointerId);
+    const dx = (cur.x - gesture.start.x) / canvas.clientWidth;
+    const dy = (cur.y - gesture.start.y) / canvas.clientHeight;
+    // Convert canvas delta -> image-fraction delta; scale by zoom for precision at high zoom
+    const fx = dx / state.zoom * (minSide / state.imgW);
+    const fy = dy / state.zoom * (minSide / state.imgH);
+    state.pan.x = clamp01(gesture.startPan.x - fx);
+    state.pan.y = clamp01(gesture.startPan.y - fy);
+    draw();
+  }
+
+  if(gesture.type === 'pinch' && active.size >= 2){
+    const pts = Array.from(active.values());
+    const curMid = mid(pts[0], pts[1]);
+    const curDist = dist(pts[0], pts[1]);
+
+    // Zoom
+    let scale = curDist / Math.max(1, gesture.startDist);
+    state.zoom = clamp(1.0, 4.0, scale * gesture.startZoom);
+
+    // Keep midpoint content roughly stable (pan compensation)
+    const dx = (curMid.x - gesture.startMid.x) / canvas.clientWidth;
+    const dy = (curMid.y - gesture.startMid.y) / canvas.clientHeight;
+    const fx = dx / state.zoom * (minSide / state.imgW);
+    const fy = dy / state.zoom * (minSide / state.imgH);
+    state.pan.x = clamp01(gesture.startPan.x - fx);
+    state.pan.y = clamp01(gesture.startPan.y - fy);
+
+    draw();
+  }
+});
+
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+function endPointer(e){
+  if(active.has(e.pointerId)) active.delete(e.pointerId);
+  if(active.size === 0) gesture = null;
+  if(active.size === 1 && (!gesture || gesture.type !== 'pan')){
+    const only = Array.from(active.values())[0];
+    gesture = { type:'pan', startPan:{...state.pan}, start:{...only} };
+  }
+}
+
+// double-tap to reset
+let lastTap=0;
+canvas.addEventListener('pointerdown', e=>{
+  const now = Date.now();
+  if(now - lastTap < 280){ resetCrop(); }
+  lastTap = now;
+}, { capture:true });
+
+function mid(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+/* Toolbar */
+$('#centerBtn').onclick = ()=>{ state.pan={x:0.5,y:0.5}; draw(); };
+$('#resetBtn').onclick  = resetCrop;
+function resetCrop(){ state.pan={x:0.5,y:0.5}; state.zoom=1; draw(); }
+
+/* Nudge */
+const step = 0.01;
+$('#nudgeUp').onclick    = ()=>{ state.pan.y = clamp01(state.pan.y - step/state.zoom); draw(); };
+$('#nudgeDown').onclick  = ()=>{ state.pan.y = clamp01(state.pan.y + step/state.zoom); draw(); };
+$('#nudgeLeft').onclick  = ()=>{ state.pan.x = clamp01(state.pan.x - step/state.zoom); draw(); };
+$('#nudgeRight').onclick = ()=>{ state.pan.x = clamp01(state.pan.x + step/state.zoom); draw(); };
+
+/* ===== Upload (matches preview math) ===== */
+$('#upload').onclick = async ()=>{
+  if(!state.partId || !state.img) return;
+  statusEl.textContent='Uploading…';
+
+  // Render current crop at 800x800
+  const out = document.createElement('canvas'); out.width = out.height = 800;
+  const oc = out.getContext('2d', { alpha:false });
+
+  const minSide = Math.min(state.imgW, state.imgH);
+  const cropSizeImg = minSide / state.zoom;
+  const half = cropSizeImg / 2;
+
+  const cx = clamp(half, state.imgW - half, state.pan.x * state.imgW);
+  const cy = clamp(half, state.imgH - half, state.pan.y * state.imgH);
+
+  const left = cx - half;
+  const top  = cy - half;
+
+  oc.drawImage(state.img, left, top, cropSizeImg, cropSizeImg, 0, 0, 800, 800);
+
+  const blob = await new Promise(res=> out.toBlob(res, 'image/jpeg', .92));
+  const fd = new FormData(); fd.append('part_id', state.partId); fd.append('image', blob, 'photo.jpg');
+  try{
+    const r=await fetch('/api/upload',{ method:'POST', body:fd }); const j=await r.json();
+    if(!r.ok) throw new Error(j.detail || 'Upload failed');
+    statusEl.textContent='✅ Uploaded!';
+  }catch(e){ statusEl.textContent='❌ '+e.message; }
+};
+
+/* Init */
+updateUploadEnabled();
+</script>
+</body>
+</html>
