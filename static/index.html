@@ -88,9 +88,22 @@
     <div id="partInfo" class="muted" style="margin-top:8px;">No part selected.</div>
   </section>
 
-  <!-- ADD PART -->
+  <!-- ADD PART (with AI Suggest) -->
   <section class="card">
     <h3 class="title">Add New Part</h3>
+
+    <!-- AI: name/description helper -->
+    <div class="col" style="gap:8px; margin-bottom:8px;">
+      <input id="aiPrompt" placeholder="Describe or paste part number (e.g., 'BC548', 'RJ45 CAT6 keystone', 'DIN 912 M3x22')" />
+      <div class="row" style="gap:8px; align-items:center;">
+        <button id="aiSuggest" class="btn">AI Suggest</button>
+        <label class="muted" style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="aiNameOnly" /> Name only
+        </label>
+        <span class="muted" id="aiStatus"></span>
+      </div>
+    </div>
+
     <div class="row" style="gap:12px; align-items:flex-start;">
       <div class="col" style="flex:1; min-width:240px;">
         <input id="newName" placeholder="Name (required)" />
@@ -156,7 +169,7 @@ const statusEl = $('#status');
 const state = {
   partId:null, partName:null,
   img:null, imgW:0, imgH:0,
-  zoom:1, pan:{x:0.5, y:0.5}  // pan is in image-fraction coords (0..1)
+  zoom:1, pan:{x:0.5, y:0.5}  // pan in image-fraction coords (0..1)
 };
 
 function setPart(p){
@@ -174,9 +187,10 @@ function updateUploadEnabled(){
 function clamp(min, max, v){ return Math.max(min, Math.min(max, v)); }
 function clamp01(v){ return clamp(0,1,v); }
 
-/* ===== Part & location search ===== */
+/* ===== Fetch helper ===== */
 async function api(path){ const r=await fetch(path); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 
+/* ===== Part search + dropdown ===== */
 const partInput = $('#partSearch'), partList = $('#partList'), partHidden = $('#partIdHidden');
 let partDebounce, partActive=-1, partItems=[];
 function hide(el){ el.style.display='none'; } function show(el){ el.style.display='block'; }
@@ -209,6 +223,7 @@ $('#lookup').onclick = async ()=>{
   partInfo.textContent='No part found.';
 };
 
+/* ===== Location search + dropdown ===== */
 const locInput = $('#locSearch'), locList = $('#locList'), locHidden = $('#newLoc');
 let locDebounce;
 function renderLocs(items){
@@ -225,6 +240,7 @@ locInput.addEventListener('input', ()=>{
 locInput.addEventListener('focus', async ()=>{ if(!locInput.value.trim()) return; try{ renderLocs(await searchLocations(locInput.value.trim())); }catch{}; });
 document.addEventListener('click', (e)=>{ if(!locList.contains(e.target) && e.target!==locInput) hide(locList); });
 
+/* ===== Create part ===== */
 $('#createPart').onclick = async ()=>{
   const name=$('#newName').value.trim(), ipn=$('#newIPN').value.trim(), desc=$('#newDesc').value.trim(), qty=$('#newQty').value.trim();
   const locPk = $('#newLoc').value.trim() || (/^\d+$/.test(locInput.value.trim())? locInput.value.trim() : '');
@@ -236,8 +252,42 @@ $('#createPart').onclick = async ()=>{
   try{
     const r=await fetch('/api/part/create',{ method:'POST', body:fd }); const j=await r.json();
     if(!r.ok) throw new Error(j.detail || 'Create failed');
-    status.textContent='✅ '+(j.message || 'Part created.'); setPart({pk:j.pk, name:j.name, ipn});
+    status.textContent='✅ '+(j.message || 'Part created.');
+    setPart({pk:j.pk, name:j.name, ipn});
   }catch(e){ status.textContent='❌ '+e.message; }
+};
+
+/* ===== AI Suggest (unified: fasteners + electronics) ===== */
+const aiBtn = document.getElementById('aiSuggest');
+const aiPromptEl = document.getElementById('aiPrompt');
+const aiStatus = document.getElementById('aiStatus');
+const aiNameOnlyEl = document.getElementById('aiNameOnly');
+
+aiBtn.onclick = async () => {
+  const prompt = aiPromptEl.value.trim();
+  if (!prompt) { aiStatus.textContent = 'Type something first (e.g., BC548, RJ45 CAT6, DIN 912 M3x22).'; return; }
+  aiStatus.textContent = 'Thinking…';
+  try {
+    const r = await fetch('/api/ai/suggest-part', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        language: (navigator.language || 'en').slice(0,2),
+        name_only: !!aiNameOnlyEl.checked
+      })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || 'AI failed');
+    // Fill form
+    document.getElementById('newName').value = j.name || '';
+    if (!aiNameOnlyEl.checked) {
+      document.getElementById('newDesc').value = j.description || '';
+    }
+    aiStatus.textContent = '✅ Suggested. Review, then Create.';
+  } catch (e) {
+    aiStatus.textContent = '❌ ' + e.message;
+  }
 };
 
 /* ===== QR "scan by photo" ===== */
@@ -298,7 +348,7 @@ function draw(){
   const left = cx - half;
   const top  = cy - half;
 
-  // Draw source square directly to canvas (no rotation)
+  // Draw source square directly to canvas
   c.drawImage(state.img, left, top, cropSizeImg, cropSizeImg, 0, 0, can.width, can.height);
 
   // Frame
@@ -336,7 +386,7 @@ canvas.addEventListener('pointermove', e=>{
     const cur = active.get(e.pointerId);
     const dx = (cur.x - gesture.start.x) / canvas.clientWidth;
     const dy = (cur.y - gesture.start.y) / canvas.clientHeight;
-    // Convert canvas delta -> image-fraction delta; scale by zoom for precision at high zoom
+    // Convert canvas delta -> image-fraction delta; scale by zoom
     const fx = dx / state.zoom * (minSide / state.imgW);
     const fy = dy / state.zoom * (minSide / state.imgH);
     state.pan.x = clamp01(gesture.startPan.x - fx);
@@ -353,7 +403,7 @@ canvas.addEventListener('pointermove', e=>{
     let scale = curDist / Math.max(1, gesture.startDist);
     state.zoom = clamp(1.0, 4.0, scale * gesture.startZoom);
 
-    // Keep midpoint content roughly stable (pan compensation)
+    // Keep midpoint content stable (pan compensation)
     const dx = (curMid.x - gesture.startMid.x) / canvas.clientWidth;
     const dy = (curMid.y - gesture.startMid.y) / canvas.clientHeight;
     const fx = dx / state.zoom * (minSide / state.imgW);
