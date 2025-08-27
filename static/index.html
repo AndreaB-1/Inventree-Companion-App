@@ -104,6 +104,18 @@
       </div>
     </div>
 
+    <div class="row" style="gap:8px; align-items:center;">
+      <button id="aiSuggest" class="btn">AI Suggest</button>
+      <label class="muted" style="display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="aiNameOnly" /> Name only
+      </label>
+      <label class="muted" style="display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="aiStrict" checked /> Strict (structured)
+      </label>
+      <span class="muted" id="aiStatus"></span>
+    </div>
+
+
     <div class="row" style="gap:12px; align-items:flex-start;">
       <div class="col" style="flex:1; min-width:240px;">
         <input id="newName" placeholder="Name (required)" />
@@ -262,6 +274,7 @@ const aiBtn = document.getElementById('aiSuggest');
 const aiPromptEl = document.getElementById('aiPrompt');
 const aiStatus = document.getElementById('aiStatus');
 const aiNameOnlyEl = document.getElementById('aiNameOnly');
+const aiStrictEl = document.getElementById('aiStrict');
 
 aiBtn.onclick = async () => {
   const prompt = aiPromptEl.value.trim();
@@ -274,7 +287,8 @@ aiBtn.onclick = async () => {
       body: JSON.stringify({
         prompt,
         language: (navigator.language || 'en').slice(0,2),
-        name_only: !!aiNameOnlyEl.checked
+        name_only: !!aiNameOnlyEl.checked,
+        strict: !!aiStrictEl.checked
       })
     });
     const j = await r.json();

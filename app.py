@@ -416,6 +416,7 @@ class AISuggestReq(BaseModel):
     prompt: str
     language: Optional[str] = None      # e.g. "en" or "it"
     name_only: Optional[bool] = False   # frontend can request only the Name
+    strict: Optional[bool] = True  # 👈 NEW: default ON
 
 def _fallback_desc_from_name(name: str) -> str:
     # If we get a short electronics name, mirror a compact description.
@@ -433,68 +434,83 @@ async def ai_suggest_part(req: AISuggestReq):
 
     # One top-level schema: model MUST return render_name/description,
     # and can include a structured sub-object for either domain.
+    strict_flag = True if req.strict is None else bool(req.strict)
+
     schema = {
-        "name": "inventory_unified",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "domain": {"type": "string", "enum": ["fastener", "electronics"]},
-                "render_name": { "type": "string", "description": "Final Name string to use" },
-                "render_description": { "type": "string", "description": "Final Description string to use" },
+    "name": "inventory_unified",
+    "strict": strict_flag,  # 👈 was True
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "domain": {"type": "string", "enum": ["fastener", "electronics"]},
+            "render_name": { "type": "string" },
+            "render_description": { "type": "string" },
 
-                "fastener": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "size_kind": { "type": "string", "enum": ["metric_thread", "sheet_metal_thread", "washer", "nut", "other"] },
-                        "diameter_mm": { "type": "number" },
-                        "length_mm": { "type": "number", "nullable": True },
-                        "pitch_mm": { "type": "number", "nullable": True },
-                        "standard": { "type": "string" },
-                        "type_name": { "type": "string" },
-                        "head": { "type": "string", "nullable": True },
-                        "drive": { "type": "string", "nullable": True },
-                        "material_short": { "type": "string" },
-                        "material_long": { "type": "string" },
-                        "property_class": { "type": "string", "nullable": True },
-                        "finish": { "type": "string", "nullable": True },
-                        "af_mm": { "type": "number", "nullable": True },
-                        "non_standard": { "type": "boolean" },
-                        "alt_standard": { "type": "string", "nullable": True },
-                        "notes": { "type": "string", "nullable": True }
-                    }
+            "fastener": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "size_kind": { "type": "string", "enum": ["metric_thread", "sheet_metal_thread", "washer", "nut", "other"] },
+                    "diameter_mm": { "type": "number" },
+                    "length_mm": { "type": "number", "nullable": True },
+                    "pitch_mm": { "type": "number", "nullable": True },
+                    "standard": { "type": "string" },
+                    "type_name": { "type": "string" },
+                    "head": { "type": "string", "nullable": True },
+                    "drive": { "type": "string", "nullable": True },
+                    "material_short": { "type": "string" },
+                    "material_long": { "type": "string" },
+                    "property_class": { "type": "string", "nullable": True },
+                    "finish": { "type": "string", "nullable": True },
+                    "af_mm": { "type": "number", "nullable": True },
+                    "non_standard": { "type": "boolean" },
+                    "alt_standard": { "type": "string", "nullable": True },
+                    "notes": { "type": "string", "nullable": True }
                 },
-
-                "electronics": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "category": { "type": "string" },     # e.g., Transistor, MOSFET, IC, Connector, Display, Module, Tool, Bearing, Sensor, Adapter, Cable
-                        "type_name": { "type": "string" },    # e.g., "Transistor NPN Bipolar", "RJ45 CAT6 Connector"
-                        "part_number": { "type": "string", "nullable": True },
-                        "series": { "type": "string", "nullable": True },   # e.g., JST XH, JST SH
-                        "brand": { "type": "string", "nullable": True },
-                        "pitch_mm": { "type": "number", "nullable": True },
-                        "pins": { "type": "integer", "nullable": True },
-                        "gender": { "type": "string", "nullable": True, "enum": ["Male", "Female", "Male-Female", "None"] },
-                        "color": { "type": "string", "nullable": True },
-                        "size_inch": { "type": "string", "nullable": True },    # e.g., 0.36", 4"
-                        "dimensions": { "type": "string", "nullable": True },   # e.g., 8x22x7mm, 32x32mm
-                        "protocol": { "type": "string", "nullable": True },     # Zigbee, Wi-Fi, RF 433MHz
-                        "voltage_v": { "type": "string", "nullable": True },
-                        "frequency_hz": { "type": "string", "nullable": True },
-                        "capacity": { "type": "string", "nullable": True },
-                        "extras": { "type": "string", "nullable": True },       # "Pass-Through", "Tool-Less", "w/Button", "Shielded", etc.
-                        "non_standard": { "type": "boolean", "default": False },
-                        "alt_standard": { "type": "string", "nullable": True }
-                    }
-                }
+                # REQUIRED MUST LIST ALL KEYS ABOVE IN STRICT MODE
+                "required": [
+                    "size_kind","diameter_mm","length_mm","pitch_mm","standard","type_name","head","drive",
+                    "material_short","material_long","property_class","finish","af_mm","non_standard","alt_standard","notes"
+                ]
             },
-            "required": ["domain", "render_name", "render_description"]
-        }
+
+            "electronics": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "category": { "type": "string" },
+                    "type_name": { "type": "string" },
+                    "part_number": { "type": "string", "nullable": True },
+                    "series": { "type": "string", "nullable": True },
+                    "brand": { "type": "string", "nullable": True },
+                    "pitch_mm": { "type": "number", "nullable": True },
+                    "pins": { "type": "integer", "nullable": True },
+                    "gender": { "type": "string", "nullable": True, "enum": ["Male", "Female", "Male-Female", "None"] },
+                    "color": { "type": "string", "nullable": True },
+                    "size_inch": { "type": "string", "nullable": True },
+                    "dimensions": { "type": "string", "nullable": True },
+                    "protocol": { "type": "string", "nullable": True },
+                    "voltage_v": { "type": "string", "nullable": True },
+                    "frequency_hz": { "type": "string", "nullable": True },
+                    "capacity": { "type": "string", "nullable": True },
+                    "extras": { "type": "string", "nullable": True },
+                    "non_standard": { "type": "boolean", "default": False },
+                    "alt_standard": { "type": "string", "nullable": True }
+                },
+                # REQUIRED MUST LIST ALL KEYS ABOVE IN STRICT MODE
+                "required": [
+                    "category","type_name","part_number","series","brand","pitch_mm","pins","gender","color",
+                    "size_inch","dimensions","protocol","voltage_v","frequency_hz","capacity","extras",
+                    "non_standard","alt_standard"
+                ]
+            }
+        },
+        # Top-level: keep these three required fields (OK for strict)
+        "required": ["domain","render_name","render_description"]
     }
+}
+
 
     lang = (req.language or "en").strip()
 
@@ -507,6 +523,8 @@ GENERAL:
 - ONE clean result. No duplicates. No code fences in your output.
 - Keep Names SHORT and readable. Description compact (single line), not marketing copy.
 - Use US terminology (e.g., "Adjustable Wrench" not "Spanner").
+- In strict mode, include every key defined in the selected sub-object (fill non-applicable fields with null or empty string).
+
 
 FASTENERS — NAME & DESCRIPTION STYLE:
 - Name: "[SIZE] – [type_name] [material_short]"
