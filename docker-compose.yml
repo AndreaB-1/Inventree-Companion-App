@@ -1,7 +1,6 @@
 services:
   web:
-    image: ghcr.io/YOUR_GH_USERNAME/inventree-uploader:latest  # Route 1 (CI-built)
-    # OR use "build: ." for Route 2 if Portainer should build from this repo
+    image: ghcr.io/andreab-1/inventree-companion-app:latest
     restart: unless-stopped
     environment:
       INVENTREE_URL: ${INVENTREE_URL}
