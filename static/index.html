@@ -298,10 +298,9 @@
       selectedPartId.value = pk;
       uploadPartId.value = pk;
       partSearchStatus.textContent = `Selected Part ID: ${pk}`;
-      try{
-        const img = await apiGET(`/api/part/image-url?pk=${pk}`);
-        selectedPartThumb.src = img.thumbnail || img.image || '';
-      }catch{ selectedPartThumb.removeAttribute('src'); }
+      // show full image via inline proxy
+      selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
+      selectedPartThumb.src = `/api/part/image-proxy?pk=${pk}&_=${Date.now()}`;
     }
   });
 
@@ -383,11 +382,9 @@
       selectedPartLabel.value = `${j.name} (ID ${j.pk})`;
       selectedPartId.value = j.pk;
       uploadPartId.value = j.pk;
-      // refresh image thumb
-      try{
-        const img = await apiGET(`/api/part/image-url?pk=${j.pk}`);
-        selectedPartThumb.src = img.thumbnail || img.image || '';
-      }catch{}
+      // show/refresh full image via proxy
+      selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
+      selectedPartThumb.src = `/api/part/image-proxy?pk=${j.pk}&_=${Date.now()}`;
     }catch(e){
       createStatus.textContent = '❌ ' + e.message;
     }
@@ -411,14 +408,13 @@
       const j = await r.json();
       if(!r.ok) throw new Error(j.detail || 'Upload failed');
       uploadStatus.textContent = '✅ Uploaded';
-      // refresh thumbs
-      try{
-        const img = await apiGET(`/api/part/image-url?pk=${pid}`);
-        selectedPartThumb.src = img.thumbnail || img.image || '';
-        if(document.getElementById('kioskPartId').value == pid){
-          document.getElementById('kioskThumb').src = img.thumbnail || img.image || '';
-        }
-      }catch{}
+      // refresh thumbs via proxy (cache-bust)
+      selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
+      selectedPartThumb.src = `/api/part/image-proxy?pk=${pid}&_=${Date.now()}`;
+      if(document.getElementById('kioskPartId').value == pid){
+        kioskThumb.onerror = () => kioskThumb.removeAttribute('src');
+        kioskThumb.src = `/api/part/image-proxy?pk=${pid}&_=${Date.now()}`;
+      }
     }catch(e){
       uploadStatus.textContent = '❌ ' + e.message;
     }
@@ -431,106 +427,4 @@
   const kioskPartId = document.getElementById('kioskPartId');
   const kioskPartLabel = document.getElementById('kioskPartLabel');
   const kioskThumb = document.getElementById('kioskThumb');
-  const stockList = document.getElementById('stockList');
-  const stockEmpty = document.getElementById('stockEmpty');
-
-  attachTypeahead({
-    inputEl: kioskQuery,
-    listEl: kioskList,
-    onQuery: async (q)=>{
-      // If numeric, still offer matches; InvenTree search covers ID/name/IPN
-      const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=10`);
-      return rows.map(r=>({pk:r.pk, label:`${r.name}${r.ipn?` (IPN: ${r.ipn})`:''}`}));
-    },
-    onPick: ({pk, label})=> loadKioskPart(pk, label)
-  });
-
-  kioskQuery.addEventListener('keydown', async (e)=>{
-    if(e.key==='Enter'){
-      const q = kioskQuery.value.trim();
-      if(!q) return;
-      // If a number, try by id first
-      if(/^\d+$/.test(q)){
-        try{
-          const p = await apiGET(`/api/part/by-id?pk=${q}`);
-          return loadKioskPart(p.pk, `${p.name}${p.ipn?` (IPN: ${p.ipn})`:''}`);
-        }catch{}
-      }
-      // else fall back to search top hit
-      try{
-        const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=1`);
-        if(rows.length){ loadKioskPart(rows[0].pk, `${rows[0].name}${rows[0].ipn?` (IPN: ${rows[0].ipn})`:''}`); }
-        else kioskStatus.textContent = 'No results';
-      }catch(e){ kioskStatus.textContent = '❌ ' + e.message; }
-    }
-  });
-
-  async function loadKioskPart(pk, label){
-    kioskPartId.value = pk;
-    kioskPartLabel.value = label || `ID ${pk}`;
-    kioskStatus.textContent = `Part ID: ${pk}`;
-    // image
-    try{
-      const img = await apiGET(`/api/part/image-url?pk=${pk}`);
-      kioskThumb.src = img.thumbnail || img.image || '';
-    }catch{ kioskThumb.removeAttribute('src'); }
-    // stock
-    await refreshStock(pk);
-  }
-
-  async function refreshStock(partId){
-    try{
-      const items = await apiGET(`/api/stock/by-part?part_id=${partId}`);
-      stockList.innerHTML = '';
-      if(!items.length){ stockEmpty.style.display='block'; return; }
-      stockEmpty.style.display='none';
-      for(const it of items){
-        const id = it.pk;
-        const row = document.createElement('div');
-        row.className = 'stock-card';
-        row.innerHTML = `
-          <div class="grow">
-            <div><strong>Stock #${id}</strong> — <span class="pill">${(it.location_path||'No location')}</span></div>
-            <div class="muted">Qty: <strong>${it.quantity}</strong></div>
-            ${it.batch ? `<div class="muted">Batch: ${it.batch}</div>` : ``}
-            ${it.serial ? `<div class="muted">Serial: ${it.serial}</div>` : ``}
-          </div>
-          <div class="right" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <input class="pill" style="width:100px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
-            <button class="btn warn" id="btn-rm-${id}">Remove</button>
-            <input class="pill" style="width:100px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
-            <button class="btn ok" id="btn-ad-${id}">Add</button>
-          </div>
-        `;
-        stockList.appendChild(row);
-        document.getElementById(`btn-rm-${id}`).onclick = async ()=>{
-          const v = parseFloat((document.getElementById(`rm-${id}`).value||'').replace(',', '.'));
-          if(!(v>0)) return;
-          await adjustQty('remove', id, v);
-        };
-        document.getElementById(`btn-ad-${id}`).onclick = async ()=>{
-          const v = parseFloat((document.getElementById(`ad-${id}`).value||'').replace(',', '.'));
-          if(!(v>0)) return;
-          await adjustQty('add', id, v);
-        };
-      }
-    }catch(e){
-      stockList.innerHTML = `<div class="muted">❌ ${e.message}</div>`;
-    }
-  }
-
-  async function adjustQty(kind, stockId, qty){
-    try{
-      const url = kind==='add' ? '/api/stock/add_qty' : '/api/stock/remove_qty';
-      await apiPOST(url, {stock_id: stockId, quantity: qty, notes: 'Kiosk adjust'});
-      await refreshStock(document.getElementById('kioskPartId').value);
-    }catch(e){
-      alert('Adjust failed: ' + e.message);
-    }
-  }
-
-  // If user already picked/created a part on Add page, mirror ID into upload box automatically
-  selectedPartId.addEventListener('change', ()=> uploadPartId.value = selectedPartId.value);
-</script>
-</body>
-</html>
+  cons

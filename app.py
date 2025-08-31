@@ -30,6 +30,12 @@ from pyzbar.pyzbar import decode as zbar_decode, ZBarSymbol
 # AI
 from openai import OpenAI
 
+import mimetypes
+import requests
+from urllib.parse import urljoin
+from fastapi.responses import StreamingResponse
+
+
 
 # ------------------------------- ENV -------------------------------
 INVENTREE_URL = os.getenv("INVENTREE_URL")  # e.g. http://192.168.1.110/api/
@@ -664,3 +670,89 @@ GENERAL:
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI error: {e}")
+
+@app.get("/api/part/image-url")
+def part_image_url(pk: str):
+    """
+    Return absolute URLs for image and thumbnail from InvenTree for a Part.
+    """
+    try:
+        api = inv_api()
+        p = api.get(f"/part/{pk}/")
+        if not p or not p.get("pk"):
+            raise HTTPException(status_code=404, detail="Part not found")
+
+        image_path = p.get("image") or ""
+        thumb_path = p.get("thumbnail") or ""
+
+        # Build absolute base (strip trailing /api[/] from INVENTREE_URL)
+        base = INVENTREE_URL.rstrip("/")
+        if base.endswith("/api"):
+            base = base[:-4]
+        if base.endswith("/api/"):
+            base = base[:-5]
+
+        def abs_url(path: str) -> str:
+            if not path:
+                return ""
+            if path.startswith("http://") or path.startswith("https://"):
+                return path
+            # InvenTree returns "/media/..." -> join with base
+            return base.rstrip("/") + path
+
+        return {
+            "image": abs_url(image_path),
+            "thumbnail": abs_url(thumb_path),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/part/image-proxy")
+def part_image_proxy(pk: str, thumb: bool = False):
+    """
+    Stream the part image (or thumbnail) inline with a correct Content-Type so the <img> renders.
+    """
+    try:
+        api = inv_api()
+        p = api.get(f"/part/{pk}/")
+        if not p or not p.get("pk"):
+            raise HTTPException(status_code=404, detail="Part not found")
+
+        path = (p.get("thumbnail") if thumb else p.get("image")) or p.get("thumbnail")
+        if not path:
+            raise HTTPException(status_code=404, detail="No image available for this part")
+
+        # Compute absolute URL as above
+        base = INVENTREE_URL.rstrip("/")
+        if base.endswith("/api"):
+            base = base[:-4]
+        if base.endswith("/api/"):
+            base = base[:-5]
+        url = path if path.startswith("http") else (base.rstrip("/") + path)
+
+        # Some setups need auth for media; include token just in case
+        headers = {}
+        if INVENTREE_TOKEN:
+            headers["Authorization"] = f"Token {INVENTREE_TOKEN}"
+
+        r = requests.get(url, headers=headers, stream=True, timeout=20)
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"InvenTree returned {r.status_code}")
+
+        ctype = r.headers.get("Content-Type", "")
+        if not ctype or "octet-stream" in ctype:
+            ctype = mimetypes.guess_type(url)[0] or "image/jpeg"
+
+        # Force inline display
+        return StreamingResponse(
+            r.raw,
+            media_type=ctype,
+            headers={"Content-Disposition": "inline"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
