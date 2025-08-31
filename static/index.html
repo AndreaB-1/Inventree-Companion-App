@@ -12,10 +12,18 @@
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
   a{color:var(--brand)}
   .app{display:grid;grid-template-columns:260px 1fr;min-height:100dvh}
-  @media (max-width: 900px){ .app{grid-template-columns:1fr} .sidebar{position:fixed;inset:0 40% 0 0;transform:translateX(-100%);transition:transform .2s;z-index:40} .sidebar.open{transform:translateX(0)} .backdrop{display:none} .sidebar.open + .backdrop{display:block;position:fixed;inset:0;background:#0007;z-index:30} }
+  @media (max-width: 900px){
+    .app{grid-template-columns:1fr}
+    .sidebar{position:fixed;inset:0 40% 0 0;transform:translateX(-100%);transition:transform .2s;z-index:40}
+    .sidebar.open{transform:translateX(0)}
+    .backdrop{display:none}
+    .sidebar.open + .backdrop{display:block;position:fixed;inset:0;background:#0007;z-index:30}
+  }
   header{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
   .hamb{display:none}
-  @media (max-width:900px){ .hamb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer} }
+  @media (max-width:900px){
+    .hamb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer}
+  }
   .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:14px;z-index:40}
   .logo{font-weight:700;color:#cdd9ff;letter-spacing:.3px;margin-bottom:10px}
   .menu{display:flex;flex-direction:column;gap:6px}
@@ -37,18 +45,17 @@
   .btn.warn{background:linear-gradient(180deg,#3a1212,#2a0e0e);border-color:#5a1a1a}
   .muted{color:var(--muted)}
   .status{font-size:.92rem}
-  .pill{padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:#0e1220;color:var(--muted);font-size:.78rem}
+  .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0e1220;color:var(--muted);font-size:.86rem}
   .thumb{width:110px;height:110px;border-radius:12px;background:#0e1220;border:1px solid var(--border);object-fit:cover}
   .list{display:flex;flex-direction:column;gap:10px}
   .stock-card{display:flex;gap:12px;align-items:flex-start;border:1px dashed var(--border);border-radius:12px;padding:10px}
   .grow{flex:1}
   .right{margin-left:auto}
   .dropdown{position:relative}
-  .dropdown-list{position:absolute;z-index:10;inset:auto 0 0 0;transform:translateY(100%);max-height:240px;overflow:auto;background:#0e1220;border:1px solid var(--border);border-radius:12px;margin-top:6px;padding:6px;display:none}
+  .dropdown-list{position:absolute;z-index:10;left:0;right:0;top:100%;max-height:280px;overflow:auto;background:#0e1220;border:1px solid var(--border);border-radius:12px;margin-top:6px;padding:6px;display:none}
   .dropdown.open .dropdown-list{display:block}
   .dropdown-item{padding:8px;border-radius:8px;cursor:pointer}
   .dropdown-item:hover{background:#171b29}
-  .divider{height:1px;background:var(--border);margin:10px 0}
 </style>
 </head>
 <body>
@@ -68,13 +75,13 @@
   <main>
     <header>
       <button class="hamb" onclick="toggleSidebar()">☰</button>
-      <div class="muted">LAN: open on phone via <code>http://SERVER:8000/</code></div>
+      <div class="muted">Open on phone via <code>http://SERVER:8000/</code></div>
     </header>
 
     <!-- ADD PAGE -->
     <section id="page-add" class="page">
       <div class="container">
-        <!-- Part Search / Select existing -->
+        <!-- Part Search -->
         <div class="card">
           <h3 style="margin:0 0 10px 0;">Select Existing Part (optional)</h3>
           <div class="row">
@@ -89,8 +96,8 @@
               <input id="selectedPartLabel" readonly placeholder="None" />
               <input type="hidden" id="selectedPartId" />
             </div>
-            <div class="col">
-              <label>Part Image</label>
+            <div class="col" style="max-width:140px">
+              <label>Image</label>
               <img id="selectedPartThumb" class="thumb" alt="No image" />
             </div>
           </div>
@@ -102,9 +109,9 @@
           <div class="row">
             <div class="col" style="min-width:260px">
               <label>Prompt</label>
-              <textarea id="aiPrompt" placeholder="e.g. M3x22 A2 DIN 912; or BC548; or RJ45 CAT6 shielded pass-through"></textarea>
+              <textarea id="aiPrompt" placeholder="e.g. M3x22 A2 DIN 912; BC548; RJ45 CAT6 shielded pass-through"></textarea>
             </div>
-            <div class="col" style="min-width:200px">
+            <div class="col" style="min-width:220px">
               <label>&nbsp;</label>
               <div class="row" style="gap:8px;align-items:center;">
                 <button id="aiSuggest" class="btn">AI Suggest</button>
@@ -112,7 +119,7 @@
                   <input type="checkbox" id="aiNameOnly" /> Name only
                 </label>
                 <label class="muted" style="display:flex;align-items:center;gap:6px;">
-                  <input type="checkbox" id="aiStrict" checked /> Strict (structured)
+                  <input type="checkbox" id="aiStrict" checked /> Strict
                 </label>
               </div>
               <div class="status" id="aiStatus"></div>
@@ -142,7 +149,7 @@
           <div class="row">
             <div class="col" style="min-width:150px">
               <label>Initial Qty (optional)</label>
-              <input id="newQty" type="number" step="0.01" placeholder="e.g. 100" />
+              <input id="newQty" type="number" step="0.01" placeholder="100" />
             </div>
             <div class="col dropdown" id="locSearchWrap">
               <label>Location (for initial qty)</label>
@@ -157,16 +164,16 @@
           </div>
         </div>
 
-        <!-- Image Upload -->
+        <!-- Upload Image -->
         <div class="card">
           <h3 style="margin:0 0 10px 0;">Upload Image (thumbnail)</h3>
           <div class="row">
-            <div class="col" style="min-width:260px">
+            <div class="col" style="min-width:240px">
               <label>Target Part ID</label>
               <input id="uploadPartId" placeholder="Auto-fills when you select/create a part" />
             </div>
-            <div class="col" style="min-width:260px">
-              <label>Image file (square crop handled server-side)</label>
+            <div class="col" style="min-width:240px">
+              <label>Image file</label>
               <input id="uploadFile" type="file" accept="image/*" />
             </div>
           </div>
@@ -195,7 +202,7 @@
               <input id="kioskPartLabel" readonly />
               <input type="hidden" id="kioskPartId" />
             </div>
-            <div class="col">
+            <div class="col" style="max-width:140px">
               <label>Image</label>
               <img id="kioskThumb" class="thumb" alt="No image" />
             </div>
@@ -227,38 +234,38 @@
     sidebar.classList.remove('open');
   }
 
-  // ---------- Helpers ----------
-  const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
-
+  // ---------- HTTP helpers ----------
   async function apiGET(url){
     const r = await fetch(url);
-    if(!r.ok){ throw new Error((await r.json()).detail || 'Request failed'); }
-    return r.json();
+    let body = null;
+    try { body = await r.json(); } catch {}
+    if(!r.ok) throw new Error((body && body.detail) || `GET ${url} failed`);
+    return body;
   }
   async function apiPOST(url, payload){
     const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-    const j = await r.json().catch(()=> ({}));
-    if(!r.ok){ throw new Error(j.detail || 'Request failed'); }
-    return j;
+    const body = await r.json().catch(()=> ({}));
+    if(!r.ok) throw new Error(body.detail || `POST ${url} failed`);
+    return body;
   }
 
+  // ---------- Typeahead ----------
   function attachTypeahead({inputEl, listEl, onQuery, onPick}){
-    let t=null, open=false;
-    const wrap = inputEl.parentElement;
-    inputEl.addEventListener('input', async ()=>{
+    let timer=null;
+    const wrap = inputEl.closest('.dropdown');
+    inputEl.addEventListener('input', ()=>{
       const q = inputEl.value.trim();
-      if(t) clearTimeout(t);
-      t = setTimeout(async ()=>{
-        if(!q){ listEl.innerHTML=''; wrap.classList.remove('open'); open=false; return; }
+      if(timer) clearTimeout(timer);
+      if(!q){ listEl.innerHTML=''; wrap.classList.remove('open'); return; }
+      timer = setTimeout(async ()=>{
         try{
           const items = await onQuery(q);
-          listEl.innerHTML = items.map(it=>(
-            `<div class="dropdown-item" data-pk="${it.pk}">${it.label}</div>`
-          )).join('');
-          wrap.classList.add('open'); open = true;
+          if(!items.length){ listEl.innerHTML = `<div class="dropdown-item muted">No results</div>`; wrap.classList.add('open'); return; }
+          listEl.innerHTML = items.map(it => `<div class="dropdown-item" data-pk="${it.pk}">${it.label}</div>`).join('');
+          wrap.classList.add('open');
         }catch(e){
           listEl.innerHTML = `<div class="dropdown-item muted">Error: ${e.message}</div>`;
-          wrap.classList.add('open'); open = true;
+          wrap.classList.add('open');
         }
       }, 150);
     });
@@ -269,11 +276,10 @@
       const label = item.textContent;
       inputEl.value = label;
       wrap.classList.remove('open');
-      open=false;
       onPick({pk, label});
     });
     document.addEventListener('click', (e)=>{
-      if(!wrap.contains(e.target)){ wrap.classList.remove('open'); open=false; }
+      if(!wrap.contains(e.target)){ wrap.classList.remove('open'); }
     });
   }
 
@@ -293,12 +299,11 @@
       const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=10`);
       return rows.map(r=>({pk:r.pk, label:`${r.name}${r.ipn?` (IPN: ${r.ipn})`:''}`}));
     },
-    onPick: async ({pk, label})=>{
+    onPick: ({pk, label})=>{
       selectedPartLabel.value = label;
       selectedPartId.value = pk;
       uploadPartId.value = pk;
       partSearchStatus.textContent = `Selected Part ID: ${pk}`;
-      // show full image via inline proxy
       selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
       selectedPartThumb.src = `/api/part/image-proxy?pk=${pk}&_=${Date.now()}`;
     }
@@ -314,7 +319,7 @@
     listEl: locList,
     onQuery: async (q)=>{
       const rows = await apiGET(`/api/locations?q=${encodeURIComponent(q)}&limit=12`);
-      return rows.map(r=>({pk:r.pk, label:`${r.path}`}));
+      return rows.map(r=>({pk:r.pk, label:r.path || r.name}));
     },
     onPick: ({pk, label})=>{
       locId.value = pk;
@@ -329,13 +334,14 @@
   const aiNameOnlyEl = document.getElementById('aiNameOnly');
   const aiStrictEl = document.getElementById('aiStrict');
 
-  aiBtn.onclick = async () => {
+  aiBtn.onclick = async ()=>{
     const prompt = aiPromptEl.value.trim();
-    if(!prompt){ aiStatus.textContent = 'Type something first (e.g., BC548, DIN 912 M3x22).'; return; }
+    if(!prompt){ aiStatus.textContent = 'Type something first.'; return; }
     aiStatus.textContent = 'Thinking…';
     try{
       const r = await fetch('/api/ai/suggest-part', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           prompt,
           language: (navigator.language||'en').slice(0,2),
@@ -345,8 +351,11 @@
       });
       const j = await r.json();
       if(!r.ok) throw new Error(j.detail || 'AI failed');
+
       document.getElementById('newName').value = j.name || '';
-      if(!aiNameOnlyEl.checked) document.getElementById('newDesc').value = j.description || '';
+      if(!aiNameOnlyEl.checked){
+        document.getElementById('newDesc').value = j.description || '';
+      }
       aiStatus.textContent = '✅ Suggested. Review, then Create.';
     }catch(e){
       aiStatus.textContent = '❌ ' + e.message;
@@ -378,11 +387,11 @@
       const r = await fetch('/api/part/create',{method:'POST', body:fd});
       const j = await r.json();
       if(!r.ok) throw new Error(j.detail || 'Create failed');
+
       createStatus.textContent = '✅ ' + (j.message || 'Created');
       selectedPartLabel.value = `${j.name} (ID ${j.pk})`;
       selectedPartId.value = j.pk;
       uploadPartId.value = j.pk;
-      // show/refresh full image via proxy
       selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
       selectedPartThumb.src = `/api/part/image-proxy?pk=${j.pk}&_=${Date.now()}`;
     }catch(e){
@@ -400,17 +409,20 @@
     if(!pid){ uploadStatus.textContent='❌ Part ID required'; return; }
     if(!file){ uploadStatus.textContent='❌ Pick an image'; return; }
     uploadStatus.textContent = 'Uploading…';
+
     const fd = new FormData();
     fd.append('part_id', pid);
     fd.append('image', file);
+
     try{
       const r = await fetch('/api/upload',{method:'POST', body:fd});
       const j = await r.json();
       if(!r.ok) throw new Error(j.detail || 'Upload failed');
+
       uploadStatus.textContent = '✅ Uploaded';
-      // refresh thumbs via proxy (cache-bust)
       selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
       selectedPartThumb.src = `/api/part/image-proxy?pk=${pid}&_=${Date.now()}`;
+
       if(document.getElementById('kioskPartId').value == pid){
         kioskThumb.onerror = () => kioskThumb.removeAttribute('src');
         kioskThumb.src = `/api/part/image-proxy?pk=${pid}&_=${Date.now()}`;
@@ -420,11 +432,108 @@
     }
   };
 
-  // ---------- Kiosk search ----------
+  // ---------- Kiosk search & stock ----------
   const kioskQuery = document.getElementById('kioskQuery');
   const kioskList = document.getElementById('kioskSearchList');
   const kioskStatus = document.getElementById('kioskStatus');
   const kioskPartId = document.getElementById('kioskPartId');
   const kioskPartLabel = document.getElementById('kioskPartLabel');
   const kioskThumb = document.getElementById('kioskThumb');
-  cons
+  const stockList = document.getElementById('stockList');
+  const stockEmpty = document.getElementById('stockEmpty');
+
+  attachTypeahead({
+    inputEl: kioskQuery,
+    listEl: kioskList,
+    onQuery: async (q)=>{
+      const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=10`);
+      return rows.map(r=>({pk:r.pk, label:`${r.name}${r.ipn?` (IPN: ${r.ipn})`:''}`}));
+    },
+    onPick: ({pk, label})=> loadKioskPart(pk, label)
+  });
+
+  kioskQuery.addEventListener('keydown', async (e)=>{
+    if(e.key==='Enter'){
+      const q = kioskQuery.value.trim();
+      if(!q) return;
+      // numeric id?
+      if(/^\d+$/.test(q)){
+        try{
+          const p = await apiGET(`/api/part/by-id?pk=${q}`);
+          return loadKioskPart(p.pk, `${p.name}${p.ipn?` (IPN: ${p.ipn})`:''}`);
+        }catch{}
+      }
+      // first search hit
+      try{
+        const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=1`);
+        if(rows.length){ loadKioskPart(rows[0].pk, `${rows[0].name}${rows[0].ipn?` (IPN: ${rows[0].ipn})`:''}`); }
+        else kioskStatus.textContent = 'No results';
+      }catch(e){ kioskStatus.textContent = '❌ ' + e.message; }
+    }
+  });
+
+  async function loadKioskPart(pk, label){
+    kioskPartId.value = pk;
+    kioskPartLabel.value = label || `ID ${pk}`;
+    kioskStatus.textContent = `Part ID: ${pk}`;
+    kioskThumb.onerror = () => kioskThumb.removeAttribute('src');
+    kioskThumb.src = `/api/part/image-proxy?pk=${pk}&_=${Date.now()}`;
+    await refreshStock(pk);
+  }
+
+  async function refreshStock(partId){
+    try{
+      const items = await apiGET(`/api/stock/by-part?part_id=${partId}`);
+      stockList.innerHTML = '';
+      if(!items.length){ stockEmpty.style.display='block'; return; }
+      stockEmpty.style.display='none';
+      for(const it of items){
+        const id = it.pk;
+        const row = document.createElement('div');
+        row.className = 'stock-card';
+        row.innerHTML = `
+          <div class="grow">
+            <div><strong>Stock #${id}</strong> — <span class="pill">${(it.location_path||'No location')}</span></div>
+            <div class="muted">Qty: <strong>${it.quantity}</strong></div>
+            ${it.batch ? `<div class="muted">Batch: ${it.batch}</div>` : ``}
+            ${it.serial ? `<div class="muted">Serial: ${it.serial}</div>` : ``}
+          </div>
+          <div class="right" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input class="pill" style="width:110px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
+            <button class="btn warn" id="btn-rm-${id}">Remove</button>
+            <input class="pill" style="width:110px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
+            <button class="btn ok" id="btn-ad-${id}">Add</button>
+          </div>
+        `;
+        stockList.appendChild(row);
+        document.getElementById(`btn-rm-${id}`).onclick = async ()=>{
+          const v = parseFloat((document.getElementById(`rm-${id}`).value||'').replace(',', '.'));
+          if(!(v>0)) return;
+          await adjustQty('remove', id, v);
+        };
+        document.getElementById(`btn-ad-${id}`).onclick = async ()=>{
+          const v = parseFloat((document.getElementById(`ad-${id}`).value||'').replace(',', '.'));
+          if(!(v>0)) return;
+          await adjustQty('add', id, v);
+        };
+      }
+    }catch(e){
+      stockList.innerHTML = `<div class="muted">❌ ${e.message}</div>`;
+    }
+  }
+
+  async function adjustQty(kind, stockId, qty){
+    try{
+      const url = kind==='add' ? '/api/stock/add_qty' : '/api/stock/remove_qty';
+      await apiPOST(url, {stock_id: stockId, quantity: qty, notes: 'Kiosk adjust'});
+      await refreshStock(document.getElementById('kioskPartId').value);
+    }catch(e){
+      alert('Adjust failed: ' + e.message);
+    }
+  }
+
+  // keep Upload Part ID in sync if user manually edits selection
+  selectedPartId.addEventListener('change', ()=> uploadPartId.value = selectedPartId.value);
+</script>
+</body>
+</html>
