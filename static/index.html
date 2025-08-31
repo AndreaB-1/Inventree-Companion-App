@@ -1,500 +1,536 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>InvenTree Photo Upload</title>
-  <style>
-    :root{
-      --bg:#0b0c0f; --card:#12141a; --muted:#9aa3b2; --text:#e7e9ee; --line:#20242e;
-      --accent:#4f46e5; --accent-2:#22c55e; --danger:#ef4444;
-      --pad:14px; --radius:16px; --maxw:820px; --shadow:0 10px 30px rgba(0,0,0,.35);
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-    }
-    @media (prefers-color-scheme: light){
-      :root{ --bg:#f6f7fb; --card:#fff; --muted:#5a6473; --text:#0b0c0f; --line:#e9edf2; --shadow:0 6px 24px rgba(0,0,0,.08); }
-    }
-    *{ box-sizing:border-box; }
-    html,body{ margin:0; height:100%; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial; }
-    .wrap{ max-width:var(--maxw); margin:0 auto; padding:16px 16px 90px; }
-    header{
-      position:sticky; top:0; z-index:30; backdrop-filter:saturate(180%) blur(10px);
-      background:color-mix(in oklab, var(--bg) 85%, transparent);
-      border-bottom:1px solid var(--line);
-    }
-    .h-row{ max-width:var(--maxw); margin:0 auto; padding:12px 16px; display:flex; align-items:center; gap:12px; }
-    .brand{ display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.2px; }
-    .brand svg{ width:28px; height:28px; }
-    .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:var(--pad); box-shadow:var(--shadow); }
-    .card + .card{ margin-top:14px; }
-    .title{ margin:0 0 8px; font-size:1.05rem; font-weight:700; letter-spacing:.2px; }
-    .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-    .col{ display:flex; flex-direction:column; gap:8px; }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InvenTree Companion</title>
+<style>
+  :root{
+    --bg:#0f1115;--panel:#151921;--muted:#8b93a7;--text:#e7eaf1;--brand:#5aa6ff;--brand-2:#1f6feb;--ok:#22c55e;--err:#ef4444;--border:#232838;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  a{color:var(--brand)}
+  .app{display:grid;grid-template-columns:260px 1fr;min-height:100dvh}
+  @media (max-width: 900px){ .app{grid-template-columns:1fr} .sidebar{position:fixed;inset:0 40% 0 0;transform:translateX(-100%);transition:transform .2s;z-index:40} .sidebar.open{transform:translateX(0)} .backdrop{display:none} .sidebar.open + .backdrop{display:block;position:fixed;inset:0;background:#0007;z-index:30} }
+  header{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+  .hamb{display:none}
+  @media (max-width:900px){ .hamb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer} }
+  .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:14px;z-index:40}
+  .logo{font-weight:700;color:#cdd9ff;letter-spacing:.3px;margin-bottom:10px}
+  .menu{display:flex;flex-direction:column;gap:6px}
+  .menu button{all:unset;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer}
+  .menu button.active{background:linear-gradient(180deg,#0e1424,#0b1020);}
+  .menu small{display:block;color:var(--muted);margin:6px 2px 2px}
 
-    input,button{ font:inherit; border-radius:12px; border:1px solid var(--line); padding:12px 14px; background:#0f1116; color:var(--text); }
-    @media (prefers-color-scheme: light){ input,button{ background:#fff; } }
-    input::placeholder{ color:var(--muted); }
-    .btn{ display:inline-flex; align-items:center; gap:8px; padding:12px 14px; border-radius:12px; border:1px solid var(--line); cursor:pointer; }
-    .btn-primary{ background:var(--accent); color:white; border-color:transparent; }
-    .btn-success{ background:var(--accent-2); color:#08140b; border-color:transparent; }
-    .muted{ color:var(--muted); font-size:.95rem; }
-
-    .dropdown{ position:absolute; top:44px; left:0; right:0; background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); display:none; max-height:280px; overflow:auto; z-index:20; }
-    .dd-item{ padding:10px 12px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    .dd-item:hover, .dd-item.active{ background:color-mix(in oklab, var(--card) 80%, var(--bg)); }
-    .dd-sub{ color:var(--muted); font-size:.9rem; }
-
-    video, canvas{ width:100%; border-radius:12px; border:1px solid var(--line); background:#000; }
-    #cropCanvas{ aspect-ratio:1/1; max-width:min(92vw, 460px); margin-inline:auto; display:block; touch-action:none; }
-
-    .toolbar{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:10px; }
-    .toolbar .btn{ padding:10px 12px; }
-
-    .sticky-bar{ position:fixed; left:0; right:0; bottom:0; z-index:40; background:color-mix(in oklab, var(--card) 88%, transparent); border-top:1px solid var(--line); backdrop-filter:saturate(180%) blur(10px); padding:10px 14px calc(10px + var(--safe-bottom)); }
-    .sb-row{ max-width:var(--maxw); margin:0 auto; display:flex; gap:10px; align-items:center; }
-    .status{ min-height:24px; color:var(--muted); }
-    .nudge{ display:inline-grid; grid-template-columns:repeat(3,36px); grid-auto-rows:36px; gap:6px; align-items:center; justify-items:center; }
-    .nudge button{ width:36px; height:36px; line-height:0; padding:0; }
-
-    .muted-small{ color:var(--muted); font-size:.85rem; text-align:center; margin-top:6px; }
-  </style>
+  .page{padding:18px}
+  .container{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  .card{background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .col{display:flex;flex-direction:column;gap:6px;min-width:180px;flex:1}
+  label{color:var(--muted);font-size:.9rem}
+  input, textarea, select{background:#0e1220;border:1px solid var(--border);border-radius:12px;color:var(--text);padding:10px 12px;outline:none}
+  textarea{min-height:84px;resize:vertical}
+  .btn{all:unset;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:12px;border:1px solid #0b1222;background:linear-gradient(180deg,#0e1424,#0b1020);cursor:pointer}
+  .btn.primary{background:linear-gradient(180deg,#1a2a4a,#12213f);border-color:#1b2b4b}
+  .btn.ok{background:linear-gradient(180deg,#0f3a22,#0c2f1c);border-color:#125a2d}
+  .btn.warn{background:linear-gradient(180deg,#3a1212,#2a0e0e);border-color:#5a1a1a}
+  .muted{color:var(--muted)}
+  .status{font-size:.92rem}
+  .pill{padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:#0e1220;color:var(--muted);font-size:.78rem}
+  .thumb{width:110px;height:110px;border-radius:12px;background:#0e1220;border:1px solid var(--border);object-fit:cover}
+  .list{display:flex;flex-direction:column;gap:10px}
+  .stock-card{display:flex;gap:12px;align-items:flex-start;border:1px dashed var(--border);border-radius:12px;padding:10px}
+  .grow{flex:1}
+  .right{margin-left:auto}
+  .dropdown{position:relative}
+  .dropdown-list{position:absolute;z-index:10;inset:auto 0 0 0;transform:translateY(100%);max-height:240px;overflow:auto;background:#0e1220;border:1px solid var(--border);border-radius:12px;margin-top:6px;padding:6px;display:none}
+  .dropdown.open .dropdown-list{display:block}
+  .dropdown-item{padding:8px;border-radius:8px;cursor:pointer}
+  .dropdown-item:hover{background:#171b29}
+  .divider{height:1px;background:var(--border);margin:10px 0}
+</style>
 </head>
 <body>
-<header>
-  <div class="h-row">
-    <div class="brand">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      InvenTree Uploader
+<div id="backdrop" class="backdrop"></div>
+<div class="app">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="logo">InvenTree Companion</div>
+    <div class="menu">
+      <small>PAGES</small>
+      <button id="nav-add" class="active" onclick="showPage('add')">➕ Add Component</button>
+      <button id="nav-kiosk" onclick="showPage('kiosk')">🗂️ Kiosk (Stock)</button>
     </div>
-    <div style="flex:1"></div>
-    <span class="muted">Mobile ready</span>
-  </div>
-</header>
+  </aside>
 
-<main class="wrap">
-  <!-- SELECT PART -->
-  <section class="card">
-    <h3 class="title">1) Select Part</h3>
-    <div class="row" style="position:relative;">
-      <div style="position:relative; flex:1; min-width:240px;">
-        <input id="partSearch" placeholder="Search by Name / IPN, or type an ID…" autocomplete="off" />
-        <input id="partIdHidden" type="hidden" />
-        <div id="partList" class="dropdown"></div>
-      </div>
-      <button id="scanPhoto" class="btn">Scan by Photo</button>
-      <input type="file" id="qrFile" accept="image/*" capture="environment" style="display:none;">
-      <button id="lookup" class="btn btn-primary">Use</button>
-    </div>
-    <div id="partInfo" class="muted" style="margin-top:8px;">No part selected.</div>
-  </section>
+  <!-- Main -->
+  <main>
+    <header>
+      <button class="hamb" onclick="toggleSidebar()">☰</button>
+      <div class="muted">LAN: open on phone via <code>http://SERVER:8000/</code></div>
+    </header>
 
-  <!-- ADD PART (with AI Suggest) -->
-  <section class="card">
-    <h3 class="title">Add New Part</h3>
-
-    <!-- AI: name/description helper -->
-    <div class="col" style="gap:8px; margin-bottom:8px;">
-      <input id="aiPrompt" placeholder="Describe or paste part number (e.g., 'BC548', 'RJ45 CAT6 keystone', 'DIN 912 M3x22')" />
-      <div class="row" style="gap:8px; align-items:center;">
-        <button id="aiSuggest" class="btn">AI Suggest</button>
-        <label class="muted" style="display:flex;align-items:center;gap:6px;">
-          <input type="checkbox" id="aiNameOnly" /> Name only
-        </label>
-        <span class="muted" id="aiStatus"></span>
-      </div>
-    </div>
-
-    <div class="row" style="gap:8px; align-items:center;">
-      <button id="aiSuggest" class="btn">AI Suggest</button>
-      <label class="muted" style="display:flex;align-items:center;gap:6px;">
-        <input type="checkbox" id="aiNameOnly" /> Name only
-      </label>
-      <label class="muted" style="display:flex;align-items:center;gap:6px;">
-        <input type="checkbox" id="aiStrict" checked /> Strict (structured)
-      </label>
-      <span class="muted" id="aiStatus"></span>
-    </div>
-
-
-    <div class="row" style="gap:12px; align-items:flex-start;">
-      <div class="col" style="flex:1; min-width:240px;">
-        <input id="newName" placeholder="Name (required)" />
-        <input id="newIPN" placeholder="IPN (optional)" />
-        <input id="newDesc" placeholder="Description (optional)" />
-      </div>
-      <div class="col" style="flex:1; min-width:240px;">
-        <div style="position:relative;">
-          <input id="locSearch" placeholder="Search Location…" autocomplete="off" />
-          <input id="newLoc" type="hidden" />
-          <div id="locList" class="dropdown"></div>
+    <!-- ADD PAGE -->
+    <section id="page-add" class="page">
+      <div class="container">
+        <!-- Part Search / Select existing -->
+        <div class="card">
+          <h3 style="margin:0 0 10px 0;">Select Existing Part (optional)</h3>
+          <div class="row">
+            <div class="col dropdown" id="partSearchWrap">
+              <label>Search part (name or IPN)</label>
+              <input id="partSearch" placeholder="Type to search…" autocomplete="off" />
+              <div id="partSearchList" class="dropdown-list"></div>
+              <small class="muted" id="partSearchStatus"></small>
+            </div>
+            <div class="col">
+              <label>Selected Part</label>
+              <input id="selectedPartLabel" readonly placeholder="None" />
+              <input type="hidden" id="selectedPartId" />
+            </div>
+            <div class="col">
+              <label>Part Image</label>
+              <img id="selectedPartThumb" class="thumb" alt="No image" />
+            </div>
+          </div>
         </div>
-        <input id="newQty" type="number" step="0.01" placeholder="Initial Qty (optional)" />
-        <button id="createPart" class="btn btn-success">Create & Select</button>
-      </div>
-    </div>
-    <div id="createStatus" class="muted" style="margin-top:8px;"></div>
-  </section>
 
-  <!-- IMAGE -->
-  <section class="card">
-    <h3 class="title">2) Image</h3>
-    <div class="row">
-      <input type="file" id="fileInput" accept="image/*" capture="environment" />
-      <span class="muted">Tip: on mobile, the file picker opens the camera.</span>
-    </div>
+        <!-- AI Suggest -->
+        <div class="card">
+          <h3 style="margin:0 0 10px 0;">AI Suggest (optional)</h3>
+          <div class="row">
+            <div class="col" style="min-width:260px">
+              <label>Prompt</label>
+              <textarea id="aiPrompt" placeholder="e.g. M3x22 A2 DIN 912; or BC548; or RJ45 CAT6 shielded pass-through"></textarea>
+            </div>
+            <div class="col" style="min-width:200px">
+              <label>&nbsp;</label>
+              <div class="row" style="gap:8px;align-items:center;">
+                <button id="aiSuggest" class="btn">AI Suggest</button>
+                <label class="muted" style="display:flex;align-items:center;gap:6px;">
+                  <input type="checkbox" id="aiNameOnly" /> Name only
+                </label>
+                <label class="muted" style="display:flex;align-items:center;gap:6px;">
+                  <input type="checkbox" id="aiStrict" checked /> Strict (structured)
+                </label>
+              </div>
+              <div class="status" id="aiStatus"></div>
+            </div>
+          </div>
+        </div>
 
-    <div style="margin-top:12px;">
-      <canvas id="cropCanvas" width="320" height="320"></canvas>
+        <!-- Create Part -->
+        <div class="card">
+          <h3 style="margin:0 0 10px 0;">Create / Update Part</h3>
+          <div class="row">
+            <div class="col">
+              <label>Name</label>
+              <input id="newName" placeholder="M3 × 22 – Socket Head Cap Screw A2" />
+            </div>
+            <div class="col">
+              <label>IPN (optional)</label>
+              <input id="newIPN" placeholder="Internal Part Number" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              <label>Description</label>
+              <textarea id="newDesc" placeholder="M3 × 22 – Socket Head Cap Screw – DIN 912 – A2 Stainless Steel"></textarea>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col" style="min-width:150px">
+              <label>Initial Qty (optional)</label>
+              <input id="newQty" type="number" step="0.01" placeholder="e.g. 100" />
+            </div>
+            <div class="col dropdown" id="locSearchWrap">
+              <label>Location (for initial qty)</label>
+              <input id="locSearch" placeholder="Type to search location…" autocomplete="off" />
+              <div id="locSearchList" class="dropdown-list"></div>
+              <input type="hidden" id="locId" />
+            </div>
+          </div>
+          <div class="row" style="gap:8px;align-items:center;">
+            <button class="btn primary" id="btnCreate">Create Part</button>
+            <span id="createStatus" class="status"></span>
+          </div>
+        </div>
 
-      <div class="toolbar">
-        <button class="btn" id="centerBtn">Center</button>
-        <button class="btn" id="resetBtn">Reset</button>
-      </div>
-
-      <div class="toolbar">
-        <div class="nudge">
-          <span></span><button class="btn" id="nudgeUp">▲</button><span></span>
-          <button class="btn" id="nudgeLeft">◀</button><span></span><button class="btn" id="nudgeRight">▶</button>
-          <span></span><button class="btn" id="nudgeDown">▼</button><span></span>
+        <!-- Image Upload -->
+        <div class="card">
+          <h3 style="margin:0 0 10px 0;">Upload Image (thumbnail)</h3>
+          <div class="row">
+            <div class="col" style="min-width:260px">
+              <label>Target Part ID</label>
+              <input id="uploadPartId" placeholder="Auto-fills when you select/create a part" />
+            </div>
+            <div class="col" style="min-width:260px">
+              <label>Image file (square crop handled server-side)</label>
+              <input id="uploadFile" type="file" accept="image/*" />
+            </div>
+          </div>
+          <div class="row" style="gap:8px;align-items:center;">
+            <button class="btn" id="btnUpload">Upload</button>
+            <span id="uploadStatus" class="status"></span>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="muted-small">Gestures: one finger = pan • two fingers = pinch-zoom • double-tap = reset</div>
-    </div>
-  </section>
-</main>
+    <!-- KIOSK PAGE -->
+    <section id="page-kiosk" class="page" hidden>
+      <div class="container">
+        <div class="card">
+          <h3 style="margin:0 0 10px 0;">Find Part</h3>
+          <div class="row">
+            <div class="col dropdown" id="kioskSearchWrap">
+              <label>Part (name/IPN or ID)</label>
+              <input id="kioskQuery" placeholder="Start typing… or paste Part ID" autocomplete="off" />
+              <div id="kioskSearchList" class="dropdown-list"></div>
+              <small class="muted" id="kioskStatus"></small>
+            </div>
+            <div class="col">
+              <label>Selected Part</label>
+              <input id="kioskPartLabel" readonly />
+              <input type="hidden" id="kioskPartId" />
+            </div>
+            <div class="col">
+              <label>Image</label>
+              <img id="kioskThumb" class="thumb" alt="No image" />
+            </div>
+          </div>
+        </div>
 
-<!-- STICKY UPLOAD BAR -->
-<div class="sticky-bar">
-  <div class="sb-row">
-    <div class="status" id="status">Pick a part and image to enable Upload.</div>
-    <button id="upload" class="btn btn-primary" disabled>Upload</button>
-  </div>
+        <div class="card">
+          <h3 style="margin:0 0 10px 0;">Stock Items</h3>
+          <div id="stockList" class="list"></div>
+          <div id="stockEmpty" class="muted">No stock items yet.</div>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
-/* ===== Helpers & state ===== */
-const $ = s => document.querySelector(s);
-const partInfo = $('#partInfo');
-const statusEl = $('#status');
+  // ---------- Layout ----------
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('backdrop');
+  function toggleSidebar(){ sidebar.classList.toggle('open'); }
+  backdrop.onclick = () => sidebar.classList.remove('open');
 
-const state = {
-  partId:null, partName:null,
-  img:null, imgW:0, imgH:0,
-  zoom:1, pan:{x:0.5, y:0.5}  // pan in image-fraction coords (0..1)
-};
-
-function setPart(p){
-  state.partId = String(p.pk); state.partName = p.name || '';
-  partInfo.innerHTML = `Selected: <span style="padding:6px 10px;border:1px solid var(--line);border-radius:999px;display:inline-block;">[${state.partId}] ${state.partName}${p.ipn ? ' • ' + p.ipn : ''}</span>`;
-  $('#partSearch').value = `${p.name || ''}${p.ipn ? ' • ' + p.ipn : ''} [${p.pk}]`.trim();
-  $('#partIdHidden').value = String(p.pk);
-  updateUploadEnabled();
-}
-function updateUploadEnabled(){
-  const ready = !!(state.partId && state.img);
-  $('#upload').disabled = !ready;
-  if (!ready) statusEl.textContent = 'Pick a part and image to enable Upload.';
-}
-function clamp(min, max, v){ return Math.max(min, Math.min(max, v)); }
-function clamp01(v){ return clamp(0,1,v); }
-
-/* ===== Fetch helper ===== */
-async function api(path){ const r=await fetch(path); if(!r.ok) throw new Error(await r.text()); return r.json(); }
-
-/* ===== Part search + dropdown ===== */
-const partInput = $('#partSearch'), partList = $('#partList'), partHidden = $('#partIdHidden');
-let partDebounce, partActive=-1, partItems=[];
-function hide(el){ el.style.display='none'; } function show(el){ el.style.display='block'; }
-function renderParts(items){
-  partItems = items||[]; partList.innerHTML='';
-  if(!partItems.length){ hide(partList); partActive=-1; return; }
-  for(let i=0;i<items.length;i++){
-    const it=items[i], d=document.createElement('div'); d.className='dd-item'+(i===partActive?' active':'');
-    const left=document.createElement('div'); left.textContent = `${it.name||''}`;
-    const right=document.createElement('div'); right.className='dd-sub'; right.textContent = `${it.ipn? 'IPN '+it.ipn+' • ' : ''}#${it.pk}`;
-    d.appendChild(left); d.appendChild(right); d.onclick=()=>{ setPart(it); hide(partList); }; partList.appendChild(d);
+  function showPage(id){
+    document.getElementById('page-add').hidden = id !== 'add';
+    document.getElementById('page-kiosk').hidden = id !== 'kiosk';
+    document.getElementById('nav-add').classList.toggle('active', id==='add');
+    document.getElementById('nav-kiosk').classList.toggle('active', id==='kiosk');
+    sidebar.classList.remove('open');
   }
-  show(partList);
-}
-async function searchParts(q){ return api('/api/parts?q='+encodeURIComponent(q||'')); }
-partInput.addEventListener('input', ()=>{
-  partHidden.value=''; const q=partInput.value.trim(); clearTimeout(partDebounce);
-  if(!q){ hide(partList); return; }
-  partDebounce=setTimeout(async()=>{ try{ renderParts(await searchParts(q)); }catch{ hide(partList); } }, 200);
-});
-partInput.addEventListener('focus', async ()=>{
-  const q=partInput.value.trim(); if(!q) return; try{ renderParts(await searchParts(q)); }catch{}
-});
-document.addEventListener('click', (e)=>{ if(!partList.contains(e.target) && e.target!==partInput) hide(partList); });
-$('#lookup').onclick = async ()=>{
-  const typed = partInput.value.trim(), hiddenId = partHidden.value.trim();
-  if(hiddenId){ setPart({ pk:hiddenId, name:typed }); return; }
-  if(/^\d+$/.test(typed)){ try{ setPart(await api('/api/part/by-id?pk='+encodeURIComponent(typed))); return; }catch{} }
-  try{ const items = await searchParts(typed); if(items.length){ setPart(items[0]); return; } }catch{}
-  partInfo.textContent='No part found.';
-};
 
-/* ===== Location search + dropdown ===== */
-const locInput = $('#locSearch'), locList = $('#locList'), locHidden = $('#newLoc');
-let locDebounce;
-function renderLocs(items){
-  locList.innerHTML=''; if(!items.length){ hide(locList); return; }
-  for(const it of items){ const d=document.createElement('div'); d.className='dd-item'; d.textContent=it.path||it.name; d.onclick=()=>{ locHidden.value=String(it.pk); locInput.value=it.path||it.name; hide(locList); }; locList.appendChild(d); }
-  show(locList);
-}
-async function searchLocations(q){ return api('/api/locations?q='+encodeURIComponent(q||'')); }
-locInput.addEventListener('input', ()=>{
-  locHidden.value=''; const q=locInput.value.trim(); clearTimeout(locDebounce);
-  if(!q){ hide(locList); return; }
-  locDebounce=setTimeout(async()=>{ try{ renderLocs(await searchLocations(q)); }catch{ hide(locList);} }, 200);
-});
-locInput.addEventListener('focus', async ()=>{ if(!locInput.value.trim()) return; try{ renderLocs(await searchLocations(locInput.value.trim())); }catch{}; });
-document.addEventListener('click', (e)=>{ if(!locList.contains(e.target) && e.target!==locInput) hide(locList); });
+  // ---------- Helpers ----------
+  const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
 
-/* ===== Create part ===== */
-$('#createPart').onclick = async ()=>{
-  const name=$('#newName').value.trim(), ipn=$('#newIPN').value.trim(), desc=$('#newDesc').value.trim(), qty=$('#newQty').value.trim();
-  const locPk = $('#newLoc').value.trim() || (/^\d+$/.test(locInput.value.trim())? locInput.value.trim() : '');
-  const status=$('#createStatus');
-  if(!name){ status.textContent='Name is required.'; return; }
-  const fd=new FormData(); fd.append('name',name);
-  if(ipn) fd.append('ipn', ipn); if(desc) fd.append('description', desc); if(qty) fd.append('initial_qty', qty); if(locPk) fd.append('location_id', locPk);
-  status.textContent='Creating...';
-  try{
-    const r=await fetch('/api/part/create',{ method:'POST', body:fd }); const j=await r.json();
-    if(!r.ok) throw new Error(j.detail || 'Create failed');
-    status.textContent='✅ '+(j.message || 'Part created.');
-    setPart({pk:j.pk, name:j.name, ipn});
-  }catch(e){ status.textContent='❌ '+e.message; }
-};
+  async function apiGET(url){
+    const r = await fetch(url);
+    if(!r.ok){ throw new Error((await r.json()).detail || 'Request failed'); }
+    return r.json();
+  }
+  async function apiPOST(url, payload){
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const j = await r.json().catch(()=> ({}));
+    if(!r.ok){ throw new Error(j.detail || 'Request failed'); }
+    return j;
+  }
 
-/* ===== AI Suggest (unified: fasteners + electronics) ===== */
-const aiBtn = document.getElementById('aiSuggest');
-const aiPromptEl = document.getElementById('aiPrompt');
-const aiStatus = document.getElementById('aiStatus');
-const aiNameOnlyEl = document.getElementById('aiNameOnly');
-const aiStrictEl = document.getElementById('aiStrict');
-
-aiBtn.onclick = async () => {
-  const prompt = aiPromptEl.value.trim();
-  if (!prompt) { aiStatus.textContent = 'Type something first (e.g., BC548, RJ45 CAT6, DIN 912 M3x22).'; return; }
-  aiStatus.textContent = 'Thinking…';
-  try {
-    const r = await fetch('/api/ai/suggest-part', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt,
-        language: (navigator.language || 'en').slice(0,2),
-        name_only: !!aiNameOnlyEl.checked,
-        strict: !!aiStrictEl.checked
-      })
+  function attachTypeahead({inputEl, listEl, onQuery, onPick}){
+    let t=null, open=false;
+    const wrap = inputEl.parentElement;
+    inputEl.addEventListener('input', async ()=>{
+      const q = inputEl.value.trim();
+      if(t) clearTimeout(t);
+      t = setTimeout(async ()=>{
+        if(!q){ listEl.innerHTML=''; wrap.classList.remove('open'); open=false; return; }
+        try{
+          const items = await onQuery(q);
+          listEl.innerHTML = items.map(it=>(
+            `<div class="dropdown-item" data-pk="${it.pk}">${it.label}</div>`
+          )).join('');
+          wrap.classList.add('open'); open = true;
+        }catch(e){
+          listEl.innerHTML = `<div class="dropdown-item muted">Error: ${e.message}</div>`;
+          wrap.classList.add('open'); open = true;
+        }
+      }, 150);
     });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.detail || 'AI failed');
-    // Fill form
-    document.getElementById('newName').value = j.name || '';
-    if (!aiNameOnlyEl.checked) {
-      document.getElementById('newDesc').value = j.description || '';
+    listEl.addEventListener('click', (e)=>{
+      const item = e.target.closest('.dropdown-item');
+      if(!item) return;
+      const pk = item.getAttribute('data-pk');
+      const label = item.textContent;
+      inputEl.value = label;
+      wrap.classList.remove('open');
+      open=false;
+      onPick({pk, label});
+    });
+    document.addEventListener('click', (e)=>{
+      if(!wrap.contains(e.target)){ wrap.classList.remove('open'); open=false; }
+    });
+  }
+
+  // ---------- Part Search (Add page) ----------
+  const partSearch = document.getElementById('partSearch');
+  const partSearchList = document.getElementById('partSearchList');
+  const partSearchStatus = document.getElementById('partSearchStatus');
+  const selectedPartLabel = document.getElementById('selectedPartLabel');
+  const selectedPartId = document.getElementById('selectedPartId');
+  const selectedPartThumb = document.getElementById('selectedPartThumb');
+  const uploadPartId = document.getElementById('uploadPartId');
+
+  attachTypeahead({
+    inputEl: partSearch,
+    listEl: partSearchList,
+    onQuery: async (q)=>{
+      const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=10`);
+      return rows.map(r=>({pk:r.pk, label:`${r.name}${r.ipn?` (IPN: ${r.ipn})`:''}`}));
+    },
+    onPick: async ({pk, label})=>{
+      selectedPartLabel.value = label;
+      selectedPartId.value = pk;
+      uploadPartId.value = pk;
+      partSearchStatus.textContent = `Selected Part ID: ${pk}`;
+      try{
+        const img = await apiGET(`/api/part/image-url?pk=${pk}`);
+        selectedPartThumb.src = img.thumbnail || img.image || '';
+      }catch{ selectedPartThumb.removeAttribute('src'); }
     }
-    aiStatus.textContent = '✅ Suggested. Review, then Create.';
-  } catch (e) {
-    aiStatus.textContent = '❌ ' + e.message;
-  }
-};
+  });
 
-/* ===== QR "scan by photo" ===== */
-$('#scanPhoto').onclick = ()=> $('#qrFile').click();
-$('#qrFile').onchange = async (e)=>{
-  const file = e.target.files[0]; if(!file) return; const fd = new FormData(); fd.append('image', file, 'qr.jpg');
-  try{
-    const r = await fetch('/api/decode_qr', { method:'POST', body: fd }); const j = await r.json();
-    if(!r.ok) throw new Error(j.detail || 'QR decode failed');
-    let val=null;
-    if (j.payload && typeof j.payload==='object' && ('part' in j.payload)) val=String(j.payload.part);
-    else if (j.text) {
-      const m = j.text.match(/(?:\?|#|&)(?:part|id|ipn)=([^&]+)/i);
-      if (m) val = decodeURIComponent(m[1]); else if (/^\d+$/.test(j.text.trim())) val=j.text.trim();
+  // ---------- Location search (Add page) ----------
+  const locSearch = document.getElementById('locSearch');
+  const locList = document.getElementById('locSearchList');
+  const locId = document.getElementById('locId');
+
+  attachTypeahead({
+    inputEl: locSearch,
+    listEl: locList,
+    onQuery: async (q)=>{
+      const rows = await apiGET(`/api/locations?q=${encodeURIComponent(q)}&limit=12`);
+      return rows.map(r=>({pk:r.pk, label:`${r.path}`}));
+    },
+    onPick: ({pk, label})=>{
+      locId.value = pk;
+      locSearch.value = label;
     }
-    if(!val) throw new Error('QR did not contain a recognizable part');
-    if(/^\d+$/.test(val)){ try{ setPart(await api('/api/part/by-id?pk='+encodeURIComponent(val))); return; }catch{} }
-    const items = await searchParts(val); if(items.length){ setPart(items[0]); return; }
-    throw new Error('Part not found');
-  }catch(err){ statusEl.textContent = 'QR error: ' + (err.message || 'failed'); }
-  finally{ e.target.value=''; }
-};
+  });
 
-/* ===== Cropper: PAN + PINCH ZOOM (no rotation) ===== */
-const canvas = $('#cropCanvas'), ctx = canvas.getContext('2d', { alpha:false });
+  // ---------- AI Suggest ----------
+  const aiBtn = document.getElementById('aiSuggest');
+  const aiPromptEl = document.getElementById('aiPrompt');
+  const aiStatus = document.getElementById('aiStatus');
+  const aiNameOnlyEl = document.getElementById('aiNameOnly');
+  const aiStrictEl = document.getElementById('aiStrict');
 
-$('#fileInput').onchange = e => {
-  const f=e.target.files[0]; if(!f) return;
-  const url = URL.createObjectURL(f);
-  const img = new Image();
-  img.onload = ()=>{ URL.revokeObjectURL(url); setImage(img); };
-  img.src = url;
-};
+  aiBtn.onclick = async () => {
+    const prompt = aiPromptEl.value.trim();
+    if(!prompt){ aiStatus.textContent = 'Type something first (e.g., BC548, DIN 912 M3x22).'; return; }
+    aiStatus.textContent = 'Thinking…';
+    try{
+      const r = await fetch('/api/ai/suggest-part', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          prompt,
+          language: (navigator.language||'en').slice(0,2),
+          name_only: !!aiNameOnlyEl.checked,
+          strict: !!aiStrictEl.checked
+        })
+      });
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.detail || 'AI failed');
+      document.getElementById('newName').value = j.name || '';
+      if(!aiNameOnlyEl.checked) document.getElementById('newDesc').value = j.description || '';
+      aiStatus.textContent = '✅ Suggested. Review, then Create.';
+    }catch(e){
+      aiStatus.textContent = '❌ ' + e.message;
+    }
+  };
 
-function setImage(img){
-  state.img = img; state.imgW = img.naturalWidth || img.width; state.imgH = img.naturalHeight || img.height;
-  state.pan = { x:0.5, y:0.5 }; state.zoom = 1;
-  draw();
-  updateUploadEnabled();
-}
+  // ---------- Create Part ----------
+  const btnCreate = document.getElementById('btnCreate');
+  const createStatus = document.getElementById('createStatus');
 
-function draw(){
-  const can = canvas, c = ctx;
-  c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,can.width,can.height);
-  if(!state.img) return;
+  btnCreate.onclick = async ()=>{
+    const name = document.getElementById('newName').value.trim();
+    const description = document.getElementById('newDesc').value.trim();
+    const ipn = document.getElementById('newIPN').value.trim();
+    const qty = document.getElementById('newQty').value.trim();
+    const location_id = document.getElementById('locId').value.trim();
 
-  // Square crop size in image pixels
-  const minSide = Math.min(state.imgW, state.imgH);
-  const cropSizeImg = minSide / state.zoom;
-  const half = cropSizeImg / 2;
+    if(!name){ createStatus.textContent='❌ Name required'; return; }
+    createStatus.textContent = 'Saving…';
 
-  // Clamp center so the crop stays inside the image
-  const cx = clamp(half, state.imgW - half, state.pan.x * state.imgW);
-  const cy = clamp(half, state.imgH - half, state.pan.y * state.imgH);
-  state.pan.x = cx / state.imgW;
-  state.pan.y = cy / state.imgH;
+    const fd = new FormData();
+    fd.append('name', name);
+    if(description) fd.append('description', description);
+    if(ipn) fd.append('ipn', ipn);
+    if(qty) fd.append('initial_qty', qty);
+    if(qty && location_id) fd.append('location_id', location_id);
 
-  const left = cx - half;
-  const top  = cy - half;
+    try{
+      const r = await fetch('/api/part/create',{method:'POST', body:fd});
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.detail || 'Create failed');
+      createStatus.textContent = '✅ ' + (j.message || 'Created');
+      selectedPartLabel.value = `${j.name} (ID ${j.pk})`;
+      selectedPartId.value = j.pk;
+      uploadPartId.value = j.pk;
+      // refresh image thumb
+      try{
+        const img = await apiGET(`/api/part/image-url?pk=${j.pk}`);
+        selectedPartThumb.src = img.thumbnail || img.image || '';
+      }catch{}
+    }catch(e){
+      createStatus.textContent = '❌ ' + e.message;
+    }
+  };
 
-  // Draw source square directly to canvas
-  c.drawImage(state.img, left, top, cropSizeImg, cropSizeImg, 0, 0, can.width, can.height);
+  // ---------- Upload image ----------
+  const btnUpload = document.getElementById('btnUpload');
+  const uploadStatus = document.getElementById('uploadStatus');
 
-  // Frame
-  c.strokeStyle = '#ffffff55'; c.lineWidth = 2; c.strokeRect(1,1,can.width-2,can.height-2);
-}
+  btnUpload.onclick = async ()=>{
+    const pid = (document.getElementById('uploadPartId').value || '').trim();
+    const file = document.getElementById('uploadFile').files[0];
+    if(!pid){ uploadStatus.textContent='❌ Part ID required'; return; }
+    if(!file){ uploadStatus.textContent='❌ Pick an image'; return; }
+    uploadStatus.textContent = 'Uploading…';
+    const fd = new FormData();
+    fd.append('part_id', pid);
+    fd.append('image', file);
+    try{
+      const r = await fetch('/api/upload',{method:'POST', body:fd});
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.detail || 'Upload failed');
+      uploadStatus.textContent = '✅ Uploaded';
+      // refresh thumbs
+      try{
+        const img = await apiGET(`/api/part/image-url?pk=${pid}`);
+        selectedPartThumb.src = img.thumbnail || img.image || '';
+        if(document.getElementById('kioskPartId').value == pid){
+          document.getElementById('kioskThumb').src = img.thumbnail || img.image || '';
+        }
+      }catch{}
+    }catch(e){
+      uploadStatus.textContent = '❌ ' + e.message;
+    }
+  };
 
-/* Pointer gestures */
-const active = new Map(); // pointerId -> {x,y}
-let gesture = null;
+  // ---------- Kiosk search ----------
+  const kioskQuery = document.getElementById('kioskQuery');
+  const kioskList = document.getElementById('kioskSearchList');
+  const kioskStatus = document.getElementById('kioskStatus');
+  const kioskPartId = document.getElementById('kioskPartId');
+  const kioskPartLabel = document.getElementById('kioskPartLabel');
+  const kioskThumb = document.getElementById('kioskThumb');
+  const stockList = document.getElementById('stockList');
+  const stockEmpty = document.getElementById('stockEmpty');
 
-canvas.addEventListener('pointerdown', e=>{
-  canvas.setPointerCapture(e.pointerId);
-  active.set(e.pointerId, { x:e.clientX, y:e.clientY });
-  if(active.size === 1){
-    gesture = { type:'pan', startPan:{...state.pan}, start:{...active.get(e.pointerId)} };
-  } else if(active.size === 2){
-    const pts = Array.from(active.values());
-    gesture = {
-      type:'pinch',
-      startPan:{...state.pan},
-      startZoom: state.zoom,
-      startMid: mid(pts[0], pts[1]),
-      startDist: dist(pts[0], pts[1])
-    };
+  attachTypeahead({
+    inputEl: kioskQuery,
+    listEl: kioskList,
+    onQuery: async (q)=>{
+      // If numeric, still offer matches; InvenTree search covers ID/name/IPN
+      const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=10`);
+      return rows.map(r=>({pk:r.pk, label:`${r.name}${r.ipn?` (IPN: ${r.ipn})`:''}`}));
+    },
+    onPick: ({pk, label})=> loadKioskPart(pk, label)
+  });
+
+  kioskQuery.addEventListener('keydown', async (e)=>{
+    if(e.key==='Enter'){
+      const q = kioskQuery.value.trim();
+      if(!q) return;
+      // If a number, try by id first
+      if(/^\d+$/.test(q)){
+        try{
+          const p = await apiGET(`/api/part/by-id?pk=${q}`);
+          return loadKioskPart(p.pk, `${p.name}${p.ipn?` (IPN: ${p.ipn})`:''}`);
+        }catch{}
+      }
+      // else fall back to search top hit
+      try{
+        const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=1`);
+        if(rows.length){ loadKioskPart(rows[0].pk, `${rows[0].name}${rows[0].ipn?` (IPN: ${rows[0].ipn})`:''}`); }
+        else kioskStatus.textContent = 'No results';
+      }catch(e){ kioskStatus.textContent = '❌ ' + e.message; }
+    }
+  });
+
+  async function loadKioskPart(pk, label){
+    kioskPartId.value = pk;
+    kioskPartLabel.value = label || `ID ${pk}`;
+    kioskStatus.textContent = `Part ID: ${pk}`;
+    // image
+    try{
+      const img = await apiGET(`/api/part/image-url?pk=${pk}`);
+      kioskThumb.src = img.thumbnail || img.image || '';
+    }catch{ kioskThumb.removeAttribute('src'); }
+    // stock
+    await refreshStock(pk);
   }
-});
 
-canvas.addEventListener('pointermove', e=>{
-  if(!active.has(e.pointerId)) return;
-  active.set(e.pointerId, { x:e.clientX, y:e.clientY });
-  if(!gesture) return;
-
-  const minSide = Math.min(state.imgW, state.imgH);
-  if(gesture.type === 'pan' && active.size === 1){
-    const cur = active.get(e.pointerId);
-    const dx = (cur.x - gesture.start.x) / canvas.clientWidth;
-    const dy = (cur.y - gesture.start.y) / canvas.clientHeight;
-    // Convert canvas delta -> image-fraction delta; scale by zoom
-    const fx = dx / state.zoom * (minSide / state.imgW);
-    const fy = dy / state.zoom * (minSide / state.imgH);
-    state.pan.x = clamp01(gesture.startPan.x - fx);
-    state.pan.y = clamp01(gesture.startPan.y - fy);
-    draw();
+  async function refreshStock(partId){
+    try{
+      const items = await apiGET(`/api/stock/by-part?part_id=${partId}`);
+      stockList.innerHTML = '';
+      if(!items.length){ stockEmpty.style.display='block'; return; }
+      stockEmpty.style.display='none';
+      for(const it of items){
+        const id = it.pk;
+        const row = document.createElement('div');
+        row.className = 'stock-card';
+        row.innerHTML = `
+          <div class="grow">
+            <div><strong>Stock #${id}</strong> — <span class="pill">${(it.location_path||'No location')}</span></div>
+            <div class="muted">Qty: <strong>${it.quantity}</strong></div>
+            ${it.batch ? `<div class="muted">Batch: ${it.batch}</div>` : ``}
+            ${it.serial ? `<div class="muted">Serial: ${it.serial}</div>` : ``}
+          </div>
+          <div class="right" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input class="pill" style="width:100px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
+            <button class="btn warn" id="btn-rm-${id}">Remove</button>
+            <input class="pill" style="width:100px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
+            <button class="btn ok" id="btn-ad-${id}">Add</button>
+          </div>
+        `;
+        stockList.appendChild(row);
+        document.getElementById(`btn-rm-${id}`).onclick = async ()=>{
+          const v = parseFloat((document.getElementById(`rm-${id}`).value||'').replace(',', '.'));
+          if(!(v>0)) return;
+          await adjustQty('remove', id, v);
+        };
+        document.getElementById(`btn-ad-${id}`).onclick = async ()=>{
+          const v = parseFloat((document.getElementById(`ad-${id}`).value||'').replace(',', '.'));
+          if(!(v>0)) return;
+          await adjustQty('add', id, v);
+        };
+      }
+    }catch(e){
+      stockList.innerHTML = `<div class="muted">❌ ${e.message}</div>`;
+    }
   }
 
-  if(gesture.type === 'pinch' && active.size >= 2){
-    const pts = Array.from(active.values());
-    const curMid = mid(pts[0], pts[1]);
-    const curDist = dist(pts[0], pts[1]);
-
-    // Zoom
-    let scale = curDist / Math.max(1, gesture.startDist);
-    state.zoom = clamp(1.0, 4.0, scale * gesture.startZoom);
-
-    // Keep midpoint content stable (pan compensation)
-    const dx = (curMid.x - gesture.startMid.x) / canvas.clientWidth;
-    const dy = (curMid.y - gesture.startMid.y) / canvas.clientHeight;
-    const fx = dx / state.zoom * (minSide / state.imgW);
-    const fy = dy / state.zoom * (minSide / state.imgH);
-    state.pan.x = clamp01(gesture.startPan.x - fx);
-    state.pan.y = clamp01(gesture.startPan.y - fy);
-
-    draw();
+  async function adjustQty(kind, stockId, qty){
+    try{
+      const url = kind==='add' ? '/api/stock/add_qty' : '/api/stock/remove_qty';
+      await apiPOST(url, {stock_id: stockId, quantity: qty, notes: 'Kiosk adjust'});
+      await refreshStock(document.getElementById('kioskPartId').value);
+    }catch(e){
+      alert('Adjust failed: ' + e.message);
+    }
   }
-});
 
-canvas.addEventListener('pointerup', endPointer);
-canvas.addEventListener('pointercancel', endPointer);
-function endPointer(e){
-  if(active.has(e.pointerId)) active.delete(e.pointerId);
-  if(active.size === 0) gesture = null;
-  if(active.size === 1 && (!gesture || gesture.type !== 'pan')){
-    const only = Array.from(active.values())[0];
-    gesture = { type:'pan', startPan:{...state.pan}, start:{...only} };
-  }
-}
-
-// double-tap to reset
-let lastTap=0;
-canvas.addEventListener('pointerdown', e=>{
-  const now = Date.now();
-  if(now - lastTap < 280){ resetCrop(); }
-  lastTap = now;
-}, { capture:true });
-
-function mid(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
-function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
-
-/* Toolbar */
-$('#centerBtn').onclick = ()=>{ state.pan={x:0.5,y:0.5}; draw(); };
-$('#resetBtn').onclick  = resetCrop;
-function resetCrop(){ state.pan={x:0.5,y:0.5}; state.zoom=1; draw(); }
-
-/* Nudge */
-const step = 0.01;
-$('#nudgeUp').onclick    = ()=>{ state.pan.y = clamp01(state.pan.y - step/state.zoom); draw(); };
-$('#nudgeDown').onclick  = ()=>{ state.pan.y = clamp01(state.pan.y + step/state.zoom); draw(); };
-$('#nudgeLeft').onclick  = ()=>{ state.pan.x = clamp01(state.pan.x - step/state.zoom); draw(); };
-$('#nudgeRight').onclick = ()=>{ state.pan.x = clamp01(state.pan.x + step/state.zoom); draw(); };
-
-/* ===== Upload (matches preview math) ===== */
-$('#upload').onclick = async ()=>{
-  if(!state.partId || !state.img) return;
-  statusEl.textContent='Uploading…';
-
-  // Render current crop at 800x800
-  const out = document.createElement('canvas'); out.width = out.height = 800;
-  const oc = out.getContext('2d', { alpha:false });
-
-  const minSide = Math.min(state.imgW, state.imgH);
-  const cropSizeImg = minSide / state.zoom;
-  const half = cropSizeImg / 2;
-
-  const cx = clamp(half, state.imgW - half, state.pan.x * state.imgW);
-  const cy = clamp(half, state.imgH - half, state.pan.y * state.imgH);
-
-  const left = cx - half;
-  const top  = cy - half;
-
-  oc.drawImage(state.img, left, top, cropSizeImg, cropSizeImg, 0, 0, 800, 800);
-
-  const blob = await new Promise(res=> out.toBlob(res, 'image/jpeg', .92));
-  const fd = new FormData(); fd.append('part_id', state.partId); fd.append('image', blob, 'photo.jpg');
-  try{
-    const r=await fetch('/api/upload',{ method:'POST', body:fd }); const j=await r.json();
-    if(!r.ok) throw new Error(j.detail || 'Upload failed');
-    statusEl.textContent='✅ Uploaded!';
-  }catch(e){ statusEl.textContent='❌ '+e.message; }
-};
-
-/* Init */
-updateUploadEnabled();
+  // If user already picked/created a part on Add page, mirror ID into upload box automatically
+  selectedPartId.addEventListener('change', ()=> uploadPartId.value = selectedPartId.value);
 </script>
 </body>
 </html>
