@@ -1,11 +1,55 @@
+# --- Python caches & artifacts ---
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.cache/
+coverage/
+htmlcov/
+
+# --- Logs, DBs, temp ---
 *.log
 *.sqlite
+*.db
+*.db-*
+logs/
+tmp/
+*.pid
+
+# --- Virtual envs & local env files ---
 .venv/
 .env
+.env.*
+
+# --- VCS / Editors / CI (not needed in the image) ---
 .git/
 .gitignore
+.gitattributes
+.github/
+.gitlab/
+.vscode/
+.idea/
+
+# --- Frontend/asset stuff (only if you’re not building assets in Docker) ---
 node_modules/
+dist/
+build/
+*.map
+npm-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+__MACOSX
+
+# --- Optional: uploads or large media not needed at build time ---
+# media/
+# uploads/
