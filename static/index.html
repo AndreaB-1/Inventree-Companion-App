@@ -63,6 +63,10 @@
   .modal .box{position:relative;background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:14px;padding:16px 18px;max-width:420px;width:92%}
   .modal h3{margin:0 0 8px 0}
   .modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+  /* Image lightbox */
+  .thumb.clickable { cursor: zoom-in; }
+  #imgModal .box { background: transparent; border: 0; padding: 0; }
+  #imgModal img { max-width: 90vw; max-height: 90vh; display: block; border-radius: 12px; box-shadow: 0 6px 40px #000a; }
 
 </style>
 </head>
@@ -268,6 +272,12 @@
     </div>
   </div>
 </div>
+<!-- Image viewer modal -->
+<div id="imgModal" class="modal" aria-hidden="true" onclick="closeImageModal(event)">
+  <div class="box">
+    <img id="imgModalPic" alt="Part image">
+  </div>
+</div>
 <script>
   // ---------- Layout ----------
   const sidebar = document.getElementById('sidebar');
@@ -339,6 +349,8 @@
   const selectedPartLabel = document.getElementById('selectedPartLabel');
   const selectedPartId = document.getElementById('selectedPartId');
   const selectedPartThumb = document.getElementById('selectedPartThumb');
+  selectedPartThumb.classList.add('clickable');
+  selectedPartThumb.addEventListener('click', () => openImageModal(selectedPartThumb.src));
   const uploadPartId = document.getElementById('uploadPartId');
 
   attachTypeahead({
@@ -414,6 +426,26 @@
   // ---------- Create Part ----------
   const btnCreate = document.getElementById('btnCreate');
   const createStatus = document.getElementById('createStatus');
+
+  // --- image lightbox modal
+  const imgModal = document.getElementById('imgModal');
+  const imgModalPic = document.getElementById('imgModalPic');
+
+  function openImageModal(url){
+    if(!url) return;
+    // strip cache-buster if present
+    const clean = url.replace(/([?&])_=\d+(&|$)/, '$1').replace(/[?&]$/, '');
+    if (imgModalPic) imgModalPic.src = clean;
+    if (imgModal) imgModal.classList.add('show');
+  }
+  function closeImageModal(e){
+    // close when clicking backdrop or pressing ESC
+    if (e && e.target && e.target !== imgModal) return;
+    if (imgModal) imgModal.classList.remove('show');
+    if (imgModalPic) imgModalPic.removeAttribute('src');
+  }
+  document.addEventListener('keydown', (ev)=>{ if(ev.key === 'Escape') closeImageModal(); });
+
 
   // --- print-confirm modal wiring (Add page)
   const DEFAULT_PART_LABEL_TEMPLATE_ID = 11; // change if your part label template ID differs
@@ -528,6 +560,8 @@
   const kioskPartId = document.getElementById('kioskPartId');
   const kioskPartLabel = document.getElementById('kioskPartLabel');
   const kioskThumb = document.getElementById('kioskThumb');
+  kioskThumb.classList.add('clickable');
+  kioskThumb.addEventListener('click', () => openImageModal(kioskThumb.src));
   const stockList = document.getElementById('stockList');
   const stockEmpty = document.getElementById('stockEmpty');
 
