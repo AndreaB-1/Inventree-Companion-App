@@ -41,6 +41,9 @@ from fastapi.responses import StreamingResponse
 # ------------------------------- ENV -------------------------------
 INVENTREE_URL = os.getenv("INVENTREE_URL")  # e.g. http://192.168.1.110/api/
 INVENTREE_TOKEN = os.getenv("INVENTREE_TOKEN")
+INVENTREE_LABEL_PLUGIN_KEY = os.getenv("INVENTREE_LABEL_PLUGIN_KEY", "inventreelabelmachine")
+INVENTREE_LABEL_MACHINE_ID = os.getenv("INVENTREE_LABEL_MACHINE_ID")  # UUID of your QL printer
+
 if not INVENTREE_URL or not INVENTREE_TOKEN:
     raise RuntimeError("Set INVENTREE_URL and INVENTREE_TOKEN in the environment (.env / compose).")
 # -------------------------------------------------------------------
@@ -87,6 +90,26 @@ def _resolve_default_label_plugin_id(api: InvenTreeAPI) -> int | None:
             name = (p.get("name") or "")
             if "labelmachine" in name.lower():
                 return p.get("pk")
+    except Exception:
+        pass
+    return None
+
+def _resolve_label_plugin_key(api: InvenTreeAPI) -> Optional[str]:
+    """
+    Return the key (string) for InvenTreeLabelMachine, or any plugin whose
+    name contains 'LabelMachine'. Returns None if not found.
+    """
+    try:
+        res = api.get("/plugin/", params={"active": True})
+        rows = res["results"] if isinstance(res, dict) and "results" in res else (res or [])
+        # exact name
+        for p in rows:
+            if (p.get("name") or "").strip() == "InvenTreeLabelMachine":
+                return p.get("key")
+        # fuzzy
+        for p in rows:
+            if "labelmachine" in (p.get("name") or "").lower():
+                return p.get("key")
     except Exception:
         pass
     return None
@@ -816,68 +839,76 @@ def label_templates(
 
 @app.get("/api/plugins/label")
 def plugins_with_label_mixin(active: Optional[bool] = True):
-    """List label-capable plugins (LabelPrintingMixin)."""
+    """List label-capable plugins (LabelPrintingMixin) with their keys."""
     try:
         api = inv_api()
         params: Dict[str, Any] = {"mixin": "label"}
         if active is not None:
             params["active"] = active
-        res = api.get("/plugins/", params=params)
+        # Path is '/plugin/' (singular)
+        res = api.get("/plugin/", params=params)
         rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
         return [
-            {
-                "pk": r.get("pk"),
-                "key": r.get("key"),
-                "name": r.get("name"),
-                "active": r.get("active"),
-            }
+            {"pk": r.get("pk"), "key": r.get("key"), "name": r.get("name"), "active": r.get("active")}
             for r in rows if isinstance(r, dict)
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class PrintJob(BaseModel):
-    template_id: int
-    items: List[int]
-    plugin_id: Optional[int] = None  # optional if you have a default
-
 
 @app.post("/api/labels/print")
 def print_labels(payload: dict):
     """
-    Body: {
-      "template_id": int,
-      "items": [int, ...],
-      "plugin_id": int | null   # optional; if missing we default to InvenTreeLabelMachine when available
-    }
+    Body from UI can be minimal:
+      {
+        "template_id": int,     # required
+        "items": [int, ...],    # required (part ids when model=part)
+        "copies": 1,            # optional
+        "plugin_key": "inventreelabelmachine",  # optional; backend will default
+        "machine_id": "UUID"    # optional; backend will default if env set
+      }
+    We then POST to InvenTree as it expects:
+      { "template": id, "items": [...], "plugin": key, "machine": uuid, "copies": n }
     """
     try:
-        template_id = int(payload.get("template_id"))
+        template_id = int(payload.get("template_id") or 0)
         items = payload.get("items") or []
-        plugin_id = payload.get("plugin_id")
-
         if not template_id or not isinstance(items, list) or not items:
             raise HTTPException(status_code=400, detail="template_id and non-empty items are required")
 
+        copies = payload.get("copies")
+        user_plugin_key = payload.get("plugin_key")
+        user_machine_id = payload.get("machine_id")
+
         api = inv_api()
 
-        # 👇 default plugin to InvenTreeLabelMachine if client didn't send one
-        if not plugin_id:
-            plugin_id = _resolve_default_label_plugin_id(api)
+        # Resolve plugin key: prefer payload -> env -> auto-detect -> None
+        plugin_key = (
+            (user_plugin_key or "").strip()
+            or (INVENTREE_LABEL_PLUGIN_KEY or "").strip()
+            or _resolve_label_plugin_key(api)
+        )
+
+        # Resolve machine id: prefer payload -> env (LabelMachine expects a UUID)
+        machine_id = (user_machine_id or "").strip() or (INVENTREE_LABEL_MACHINE_ID or "").strip()
 
         body = {
             "template": template_id,
             "items": items,
         }
-        if plugin_id:
-            body["plugin"] = int(plugin_id)  # InvenTree expects 'plugin' field
+        if plugin_key:
+            body["plugin"] = plugin_key  # <- key STRING, e.g. "inventreelabelmachine"
+        if machine_id:
+            body["machine"] = machine_id  # <- UUID from your LabelMachine config
+        if copies:
+            body["copies"] = int(copies)
 
         res = api.post("/label/print/", body)
-        # res may be a job dict; just mirror ok
         return {"ok": True, "result": res}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
