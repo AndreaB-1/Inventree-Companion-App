@@ -69,6 +69,28 @@ app.add_middleware(
 # Serve static frontend
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+def _resolve_default_label_plugin_id(api: InvenTreeAPI) -> int | None:
+    """
+    Try to find the 'InvenTreeLabelMachine' plugin id.
+    Falls back to any active plugin whose name contains 'LabelMachine'.
+    Returns None if none found (server will use its own default).
+    """
+    try:
+        res = api.get("/plugin/", params={"active": True})
+        rows = res["results"] if isinstance(res, dict) and "results" in res else (res or [])
+        # exact name match
+        for p in rows:
+            if (p.get("name") or "").strip() == "InvenTreeLabelMachine":
+                return p.get("pk")
+        # fuzzy fallback
+        for p in rows:
+            name = (p.get("name") or "")
+            if "labelmachine" in name.lower():
+                return p.get("pk")
+    except Exception:
+        pass
+    return None
+
 
 @app.get("/")
 def index():
@@ -822,14 +844,40 @@ class PrintJob(BaseModel):
 
 
 @app.post("/api/labels/print")
-def labels_print(job: PrintJob):
-    """Send a label print job to InvenTree (which routes to your Brother plugin)."""
+def print_labels(payload: dict):
+    """
+    Body: {
+      "template_id": int,
+      "items": [int, ...],
+      "plugin_id": int | null   # optional; if missing we default to InvenTreeLabelMachine when available
+    }
+    """
     try:
+        template_id = int(payload.get("template_id"))
+        items = payload.get("items") or []
+        plugin_id = payload.get("plugin_id")
+
+        if not template_id or not isinstance(items, list) or not items:
+            raise HTTPException(status_code=400, detail="template_id and non-empty items are required")
+
         api = inv_api()
-        payload: Dict[str, Any] = {"template": job.template_id, "items": job.items}
-        if job.plugin_id is not None:
-            payload["plugin"] = job.plugin_id
-        resp = api.post("/label/print/", payload)
-        return {"ok": True, "response": resp}
+
+        # 👇 default plugin to InvenTreeLabelMachine if client didn't send one
+        if not plugin_id:
+            plugin_id = _resolve_default_label_plugin_id(api)
+
+        body = {
+            "template": template_id,
+            "items": items,
+        }
+        if plugin_id:
+            body["plugin"] = int(plugin_id)  # InvenTree expects 'plugin' field
+
+        res = api.post("/label/print/", body)
+        # res may be a job dict; just mirror ok
+        return {"ok": True, "result": res}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
