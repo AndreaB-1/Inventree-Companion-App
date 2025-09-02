@@ -257,7 +257,17 @@
     </section>
   </main>
 </div>
-
+<!-- Print confirmation modal (Add page) -->
+<div id="printConfirmModal" class="modal" aria-hidden="true">
+  <div class="box">
+    <h3>Print label?</h3>
+    <p class="muted">Print a part label for this newly created item using your default printer?</p>
+    <div class="actions">
+      <button class="btn" id="modalNo">No</button>
+      <button class="btn ok" id="modalYes">Print</button>
+    </div>
+  </div>
+</div>
 <script>
   // ---------- Layout ----------
   const sidebar = document.getElementById('sidebar');
@@ -406,22 +416,28 @@
   const createStatus = document.getElementById('createStatus');
 
   // --- print-confirm modal wiring (Add page)
-  const DEFAULT_PART_LABEL_TEMPLATE_ID = 11; // <- change if your part label template isn't 11
+  const DEFAULT_PART_LABEL_TEMPLATE_ID = 11; // change if your part label template ID differs
   const printModal = document.getElementById('printConfirmModal');
+  const modalNoBtn = document.getElementById('modalNo');
+  const modalYesBtn = document.getElementById('modalYes');
   let _lastCreatedPartId = null;
 
-  function openPrintModal(partId){ _lastCreatedPartId = partId; printModal.classList.add('show'); }
-  function closePrintModal(){ printModal.classList.remove('show'); }
+  function openPrintModal(partId){
+    _lastCreatedPartId = partId;
+    if (printModal) printModal.classList.add('show');
+  }
+  function closePrintModal(){
+    if (printModal) printModal.classList.remove('show');
+  }
 
-  document.getElementById('modalNo').onclick = () => closePrintModal();
+  if (modalNoBtn) modalNoBtn.addEventListener('click', closePrintModal);
 
-  document.getElementById('modalYes').onclick = async () => {
+  if (modalYesBtn) modalYesBtn.addEventListener('click', async () => {
     const pid = _lastCreatedPartId;
     closePrintModal();
     if(!pid) return;
     createStatus.textContent = 'Sending print job…';
     try{
-      // part model → items = [part_id]; backend uses default LabelMachine + printer via env
       const res = await fetch('/api/labels/print', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -433,7 +449,7 @@
     }catch(e){
       createStatus.textContent = '❌ Print failed: ' + e.message;
     }
-  };
+  });
 
 
   btnCreate.onclick = async ()=>{
@@ -709,17 +725,5 @@ async function loadKioskPart(pk, label){
     await refreshPrintTemplates();
   };
 </script>
-<!-- Print confirmation modal (Add page) -->
-<div id="printConfirmModal" class="modal" aria-hidden="true">
-  <div class="box">
-    <h3>Print label?</h3>
-    <p class="muted">Print a part label for this newly created item using your default printer?</p>
-    <div class="actions">
-      <button class="btn" id="modalNo">No</button>
-      <button class="btn ok" id="modalYes">Print</button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
