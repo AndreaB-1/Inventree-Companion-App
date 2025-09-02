@@ -37,6 +37,7 @@ from fastapi.responses import StreamingResponse
 
 
 
+
 # ------------------------------- ENV -------------------------------
 INVENTREE_URL = os.getenv("INVENTREE_URL")  # e.g. http://192.168.1.110/api/
 INVENTREE_TOKEN = os.getenv("INVENTREE_TOKEN")
@@ -754,5 +755,81 @@ def part_image_proxy(pk: str, thumb: bool = False):
         )
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --------------- Label Templates / Plugins / Print (minimal) ---------------
+
+@app.get("/api/labels/templates")
+def label_templates(
+    model_type: str,
+    enabled: bool = True,
+    search: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Proxy InvenTree label templates (model_type: part|stockitem|stocklocation)."""
+    try:
+        api = inv_api()
+        params: Dict[str, Any] = {"model_type": model_type, "limit": limit, "offset": offset}
+        if enabled is not None:
+            params["enabled"] = enabled
+        if search:
+            params["search"] = search
+        res = api.get("/label/template/", params=params)
+        rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
+        return [
+            {
+                "pk": r.get("pk"),
+                "name": r.get("name"),
+                "model_type": r.get("model_type"),
+                "description": r.get("description"),
+                "enabled": r.get("enabled"),
+            }
+            for r in rows if isinstance(r, dict)
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/plugins/label")
+def plugins_with_label_mixin(active: Optional[bool] = True):
+    """List label-capable plugins (LabelPrintingMixin)."""
+    try:
+        api = inv_api()
+        params: Dict[str, Any] = {"mixin": "label"}
+        if active is not None:
+            params["active"] = active
+        res = api.get("/plugins/", params=params)
+        rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
+        return [
+            {
+                "pk": r.get("pk"),
+                "key": r.get("key"),
+                "name": r.get("name"),
+                "active": r.get("active"),
+            }
+            for r in rows if isinstance(r, dict)
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PrintJob(BaseModel):
+    template_id: int
+    items: List[int]
+    plugin_id: Optional[int] = None  # optional if you have a default
+
+
+@app.post("/api/labels/print")
+def labels_print(job: PrintJob):
+    """Send a label print job to InvenTree (which routes to your Brother plugin)."""
+    try:
+        api = inv_api()
+        payload: Dict[str, Any] = {"template": job.template_id, "items": job.items}
+        if job.plugin_id is not None:
+            payload["plugin"] = job.plugin_id
+        resp = api.post("/label/print/", payload)
+        return {"ok": True, "response": resp}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

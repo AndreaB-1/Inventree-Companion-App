@@ -171,6 +171,7 @@
             <div class="col" style="min-width:240px">
               <label>Target Part ID</label>
               <input id="uploadPartId" placeholder="Auto-fills when you select/create a part" />
+            </div>
             <div class="col" style="min-width:240px">
               <label>Image file (camera)</label>
               <input id="uploadFile" type="file" accept="image/*" capture="environment" />
@@ -213,6 +214,36 @@
           <h3 style="margin:0 0 10px 0;">Stock Items</h3>
           <div id="stockList" class="list"></div>
           <div id="stockEmpty" class="muted">No stock items yet.</div>
+        </div>
+        <!-- Print Labels (NEW) -->
+        <div class="card" id="print-card" style="display:none">
+          <h3 style="margin-top:0">Print Labels</h3>
+          <div class="row">
+            <div>
+              <label>Model Type</label>
+              <select id="label-model">
+                <option value="stockitem">stockitem</option>
+                <option value="part">part</option>
+                <option value="stocklocation">stocklocation</option>
+              </select>
+            </div>
+            <div>
+              <label>Label Template</label>
+              <select id="label-template"></select>
+            </div>
+            <div>
+              <label>Printer Plugin (optional)</label>
+              <select id="label-plugin">
+                <option value="">(default)</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn" id="btn-load-templates">↻ Refresh Templates</button>
+            <button class="btn" id="btn-print">🖨️ Print</button>
+          </div>
+          <div class="tiny note">Select stock rows (to print stockitem labels), or switch to “part” to print the current part.</div>
+          <div id="print-status" class="tiny"></div>
         </div>
       </div>
     </section>
@@ -472,14 +503,18 @@
     }
   });
 
-  async function loadKioskPart(pk, label){
-    kioskPartId.value = pk;
-    kioskPartLabel.value = label || `ID ${pk}`;
-    kioskStatus.textContent = `Part ID: ${pk}`;
-    kioskThumb.onerror = () => kioskThumb.removeAttribute('src');
-    kioskThumb.src = `/api/part/image-proxy?pk=${pk}&_=${Date.now()}`;
-    await refreshStock(pk);
-  }
+async function loadKioskPart(pk, label){
+  kioskPartId.value = pk;
+  kioskPartLabel.value = label || `ID ${pk}`;
+  kioskStatus.textContent = `Part ID: ${pk}`;
+  kioskThumb.onerror = () => kioskThumb.removeAttribute('src');
+  kioskThumb.src = `/api/part/image-proxy?pk=${pk}&_=${Date.now()}`;
+  await refreshStock(pk);
+
+  // 👉 enable/prepare the Print Labels panel for this part
+  await window.kioskEnablePrintPanel(pk);
+}
+
 
   async function refreshStock(partId){
     try{
@@ -499,6 +534,11 @@
             ${it.serial ? `<div class="muted">Serial: ${it.serial}</div>` : ``}
           </div>
           <div class="right" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <!-- ✅ checkbox to select this stock item for printing -->
+            <label class="pill" style="display:flex;align-items:center;gap:6px">
+              <input type="checkbox" class="chk" value="${id}"> Print
+            </label>
+
             <input class="pill" style="width:110px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
             <button class="btn warn" id="btn-rm-${id}">Remove</button>
             <input class="pill" style="width:110px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
@@ -534,6 +574,98 @@
 
   // keep Upload Part ID in sync if user manually edits selection
   selectedPartId.addEventListener('change', ()=> uploadPartId.value = selectedPartId.value);
+
+  // ---------- Print: helpers (ADD) ----------
+  async function refreshPrintPlugins(){
+    try{
+      const res = await fetch('/api/plugins/label?active=true');
+      const data = await res.json();
+      const sel = document.getElementById('label-plugin');
+      if(!sel) return;
+      sel.innerHTML = '<option value="">(default)</option>';
+      (data||[]).forEach(p=>{
+        const o = document.createElement('option');
+        o.value = p.pk;
+        o.textContent = `${p.name}`;
+        sel.appendChild(o);
+      });
+    }catch(e){ /* ignore */ }
+  }
+
+  async function refreshPrintTemplates(){
+    const model = document.getElementById('label-model').value;
+    try{
+      const res = await fetch(`/api/labels/templates?model_type=${encodeURIComponent(model)}&enabled=true`);
+      const data = await res.json();
+      const sel = document.getElementById('label-template');
+      sel.innerHTML = '';
+      (data||[]).forEach(t=>{
+        const o = document.createElement('option');
+        o.value = t.pk;
+        o.textContent = `${t.name} (${t.model_type})`;
+        sel.appendChild(o);
+      });
+    }catch(e){ /* ignore */ }
+  }
+
+  document.getElementById('label-model').addEventListener('change', refreshPrintTemplates);
+  document.getElementById('btn-load-templates').addEventListener('click', refreshPrintTemplates);
+
+  document.getElementById('btn-print').addEventListener('click', async ()=>{
+    const status = document.getElementById('print-status');
+    const model = document.getElementById('label-model').value;
+    const templateId = Number(document.getElementById('label-template').value);
+    const pluginVal = document.getElementById('label-plugin').value;
+    const pluginId = pluginVal ? Number(pluginVal) : null;
+
+    if(!templateId){ status.textContent = 'Pick a template'; return; }
+
+    // Collect items: for stockitem, gather selected rows; for part, use currentPartId
+    let items = [];
+    if(model === 'stockitem'){
+      // NOTE: if your checkboxes use a different selector than '#stock-table .chk', change it here:
+      const checks = Array.from(document.querySelectorAll('#stockList .chk:checked'));
+      if(checks.length === 0){ status.textContent = 'Select at least one stock item'; return; }
+      items = checks.map(c=>Number(c.value));
+    } else if (model === 'part'){
+      // If your code stores current part id differently, replace the next line accordingly:
+      const pid = window.currentPartId || null;
+      if(!pid){ status.textContent = 'No part selected'; return; }
+      items = [Number(pid)];
+    } else {
+      status.textContent = 'stocklocation printing not wired here';
+      return;
+    }
+
+    status.textContent = 'Sending print job...';
+    try{
+      const body = { template_id: templateId, items: items };
+      if(pluginId !== null) body.plugin_id = pluginId;
+      const res = await fetch('/api/labels/print', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      if(!res.ok){ throw new Error(await res.text()); }
+      status.innerHTML = '<span class="ok">Print job sent</span>';
+    }catch(e){
+      status.innerHTML = `<span class="err">${e}</span>`;
+    }
+  });
+
+  // Call this AFTER your kiosk search selects a part and renders stock rows:
+  window.kioskEnablePrintPanel = async function(partId){
+    // Store current part id for the 'part' model printing
+    window.currentPartId = partId;
+    // Show the card
+    const card = document.getElementById('print-card');
+    if(card) card.style.display = '';
+    // Default to stockitem printing when stock rows are present:
+    const modelSel = document.getElementById('label-model');
+    if(modelSel) modelSel.value = 'stockitem';
+    await refreshPrintPlugins();
+    await refreshPrintTemplates();
+  };
 </script>
 </body>
 </html>
