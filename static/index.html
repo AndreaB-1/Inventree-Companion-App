@@ -56,6 +56,14 @@
   .dropdown.open .dropdown-list{display:block}
   .dropdown-item{padding:8px;border-radius:8px;cursor:pointer}
   .dropdown-item:hover{background:#171b29}
+  /* Modal for print confirm */
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:60}
+  .modal.show{display:flex}
+  .modal::before{content:"";position:absolute;inset:0;background:#0009;backdrop-filter:blur(2px)}
+  .modal .box{position:relative;background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:14px;padding:16px 18px;max-width:420px;width:92%}
+  .modal h3{margin:0 0 8px 0}
+  .modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+
 </style>
 </head>
 <body>
@@ -397,6 +405,37 @@
   const btnCreate = document.getElementById('btnCreate');
   const createStatus = document.getElementById('createStatus');
 
+  // --- print-confirm modal wiring (Add page)
+  const DEFAULT_PART_LABEL_TEMPLATE_ID = 11; // <- change if your part label template isn't 11
+  const printModal = document.getElementById('printConfirmModal');
+  let _lastCreatedPartId = null;
+
+  function openPrintModal(partId){ _lastCreatedPartId = partId; printModal.classList.add('show'); }
+  function closePrintModal(){ printModal.classList.remove('show'); }
+
+  document.getElementById('modalNo').onclick = () => closePrintModal();
+
+  document.getElementById('modalYes').onclick = async () => {
+    const pid = _lastCreatedPartId;
+    closePrintModal();
+    if(!pid) return;
+    createStatus.textContent = 'Sending print job…';
+    try{
+      // part model → items = [part_id]; backend uses default LabelMachine + printer via env
+      const res = await fetch('/api/labels/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: DEFAULT_PART_LABEL_TEMPLATE_ID, items: [Number(pid)] })
+      });
+      const j = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(j.detail || 'Print failed');
+      createStatus.textContent = '🖨️ Print job sent';
+    }catch(e){
+      createStatus.textContent = '❌ Print failed: ' + e.message;
+    }
+  };
+
+
   btnCreate.onclick = async ()=>{
     const name = document.getElementById('newName').value.trim();
     const description = document.getElementById('newDesc').value.trim();
@@ -425,6 +464,9 @@
       uploadPartId.value = j.pk;
       selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
       selectedPartThumb.src = `/api/part/image-proxy?pk=${j.pk}&_=${Date.now()}`;
+      // Store current part id for printing elsewhere and ask to print now
+      window.currentPartId = j.pk;
+      openPrintModal(j.pk);
     }catch(e){
       createStatus.textContent = '❌ ' + e.message;
     }
@@ -667,5 +709,17 @@ async function loadKioskPart(pk, label){
     await refreshPrintTemplates();
   };
 </script>
+<!-- Print confirmation modal (Add page) -->
+<div id="printConfirmModal" class="modal" aria-hidden="true">
+  <div class="box">
+    <h3>Print label?</h3>
+    <p class="muted">Print a part label for this newly created item using your default printer?</p>
+    <div class="actions">
+      <button class="btn" id="modalNo">No</button>
+      <button class="btn ok" id="modalYes">Print</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
