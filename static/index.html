@@ -67,6 +67,12 @@
   .thumb.clickable { cursor: zoom-in; }
   #imgModal .box { background: transparent; border: 0; padding: 0; }
   #imgModal img { max-width: 90vw; max-height: 90vh; display: block; border-radius: 12px; box-shadow: 0 6px 40px #000a; }
+  /* Search grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .part-card{background:#0e1220;border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+  .part-card img{width:100%;height:160px;object-fit:cover;border-radius:10px;border:1px solid var(--border);background:#0b0f1b}
+  .part-card .title{font-weight:600}
+  .part-card .meta{color:var(--muted);font-size:.9rem}
 
 </style>
 </head>
@@ -80,6 +86,7 @@
       <small>PAGES</small>
       <button id="nav-add" class="active" onclick="showPage('add')">➕ Add Component</button>
       <button id="nav-kiosk" onclick="showPage('kiosk')">🗂️ Kiosk (Stock)</button>
+        <button id="nav-search" onclick="showPage('search')">🔎 Search</button>
     </div>
   </aside>
 
@@ -259,6 +266,34 @@
         </div>
       </div>
     </section>
+    <!-- SEARCH PAGE -->
+    <section id="page-search" class="page" hidden>
+      <div class="container">
+        <div class="card">
+          <h3 style="margin:0 0 10px 0;">Search Parts</h3>
+          <div class="row">
+            <div class="col">
+              <label>Search</label>
+              <input id="searchInput" placeholder="Type words (space-separated) and press Enter" autocomplete="off" />
+              <small class="muted">Matches parts that contain <em>all</em> words in any order. Leave blank to browse all.</small>
+            </div>
+            <div class="col" style="max-width:160px">
+              <label>&nbsp;</label>
+              <button class="btn" id="btnSearchGo">Search</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div id="searchStatus" class="muted"></div>
+          <div id="searchGrid" class="grid"></div>
+          <div style="margin-top:10px;display:flex;justify-content:center">
+            <button class="btn" id="btnSearchMore" style="display:none">Load more</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 <!-- Print confirmation modal (Add page) -->
@@ -288,10 +323,17 @@
   function showPage(id){
     document.getElementById('page-add').hidden = id !== 'add';
     document.getElementById('page-kiosk').hidden = id !== 'kiosk';
+    document.getElementById('page-search').hidden = id !== 'search';
+
     document.getElementById('nav-add').classList.toggle('active', id==='add');
     document.getElementById('nav-kiosk').classList.toggle('active', id==='kiosk');
+    document.getElementById('nav-search').classList.toggle('active', id==='search');
+
     sidebar.classList.remove('open');
+
+    if(id === 'search'){ ensureSearchInitialized(); }
   }
+
 
   // ---------- HTTP helpers ----------
   async function apiGET(url){
@@ -666,6 +708,144 @@ async function loadKioskPart(pk, label){
 
   // keep Upload Part ID in sync if user manually edits selection
   selectedPartId.addEventListener('change', ()=> uploadPartId.value = selectedPartId.value);
+  // ---------- Search page (parts as large image cards) ----------
+  const searchInput = document.getElementById('searchInput');
+  const btnSearchGo = document.getElementById('btnSearchGo');
+  const btnSearchMore = document.getElementById('btnSearchMore');
+  const searchGrid = document.getElementById('searchGrid');
+  const searchStatus = document.getElementById('searchStatus');
+
+  let _searchInit = false;
+  let searchState = { q: '', offset: 0, limit: 24, loading: false, done: false };
+
+  function ensureSearchInitialized(){
+    if(_searchInit) return;
+    _searchInit = true;
+    resetSearch('');
+  }
+
+  function esc(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  function parseWords(q){
+    return (q||'')
+      .toLowerCase()
+      .split(/\s+/)
+      .map(w=>w.trim())
+      .filter(Boolean);
+  }
+
+  function matchesAllWords(part, words){
+    if(!words.length) return true;
+    const blob = `${part.name||''} ${part.ipn||''} ${part.description||''}`.toLowerCase();
+    return words.every(w => blob.includes(w));
+  }
+
+  async function fetchPartsPage(q, offset, limit){
+    const u = new URL(location.origin + `/api/parts`);
+    if(q) u.searchParams.set('q', q); // server 'search' for broad fetch
+    u.searchParams.set('limit', String(limit));
+    u.searchParams.set('offset', String(offset));
+    return await apiGET(u.pathname + u.search);
+  }
+
+  async function fillStockTotalForCard(cardEl, partId){
+    try{
+      const items = await apiGET(`/api/stock/by-part?part_id=${partId}`);
+      const total = (items||[]).reduce((acc, it)=> acc + (parseFloat(it.quantity)||0), 0);
+      const span = cardEl.querySelector('.stock');
+      if(span) span.textContent = String(total);
+    }catch(_){
+      const span = cardEl.querySelector('.stock');
+      if(span) span.textContent = '0';
+    }
+  }
+
+  async function renderSearch({reset=false} = {}){
+    if(searchState.loading || (searchState.done && !reset)) return;
+
+    const words = parseWords(searchState.q);
+
+    if(reset){
+      searchState.offset = 0;
+      searchState.done = false;
+      searchGrid.innerHTML = '';
+      searchStatus.textContent = words.length ? `Searching for: ${words.join(' AND ')}` : 'Browsing all parts';
+    }
+
+    searchState.loading = true;
+    btnSearchMore.style.display = 'none';
+
+    try{
+      const page = await fetchPartsPage(words[0] || '', searchState.offset, searchState.limit);
+      // Client-side AND-filter across words:
+      const filtered = page.filter(p => matchesAllWords(p, words));
+
+      if(filtered.length === 0 && page.length === 0){
+        if(searchState.offset === 0){
+          searchStatus.textContent = 'No parts found.';
+          searchGrid.innerHTML = '';
+        }
+        searchState.done = true;
+        return;
+      }
+
+      // Render cards
+      for(const p of filtered){
+        const card = document.createElement('div');
+        card.className = 'part-card';
+        card.setAttribute('data-pk', p.pk);
+        const label = `${p.name}${p.ipn ? ` (IPN: ${p.ipn})` : ''}`;
+        const imgUrl = `/api/part/image-proxy?pk=${p.pk}&_=${Date.now()}`;
+
+        card.innerHTML = `
+          <img src="${imgUrl}" alt="${esc(p.name||'Part image')}" onerror="this.style.display='none'">
+          <div class="title">${esc(p.name || 'Unnamed')}</div>
+          <div class="meta">${p.ipn ? `IPN: ${esc(p.ipn)} · ` : ''}Stock: <span class="stock">…</span></div>
+        `;
+
+        // Click -> jump to kiosk for that part
+        card.addEventListener('click', ()=>{
+          showPage('kiosk');
+          loadKioskPart(p.pk, label);
+        });
+
+        // If you implemented image preview earlier, use it on image click:
+        card.querySelector('img')?.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          if(typeof window.openImagePreview === 'function'){
+            window.openImagePreview(imgUrl);
+          }
+        });
+
+        searchGrid.appendChild(card);
+
+        // fill stock total asynchronously
+        fillStockTotalForCard(card, p.pk);
+      }
+
+      // Paging
+      searchState.offset += page.length;
+      btnSearchMore.style.display = (page.length >= searchState.limit) ? '' : 'none';
+      if(page.length < searchState.limit){
+        searchState.done = true;
+      }
+    }catch(e){
+      searchStatus.textContent = '❌ ' + e.message;
+    }finally{
+      searchState.loading = false;
+    }
+  }
+
+  function resetSearch(q){
+    searchState.q = q || '';
+    renderSearch({reset:true});
+  }
+
+  btnSearchGo?.addEventListener('click', ()=> resetSearch(searchInput.value));
+  searchInput?.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ resetSearch(searchInput.value); }
+  });
+  btnSearchMore?.addEventListener('click', ()=> renderSearch({reset:false}));
 
   // ---------- Print: helpers (ADD) ----------
   async function refreshPrintPlugins(){
