@@ -14,7 +14,7 @@
   .app{display:grid;grid-template-columns:260px 1fr;min-height:100dvh}
   @media (max-width: 900px){
     .app{grid-template-columns:1fr}
-    .sidebar{position:fixed;inset:0 30% 0 0;transform:translateX(-100%);transition:transform .25s ease;z-index:40}
+    .sidebar{position:fixed;inset:0 40% 0 0;transform:translateX(-100%);transition:transform .2s;z-index:40}
     .sidebar.open{transform:translateX(0)}
     .backdrop{display:none}
     .sidebar.open + .backdrop{display:block;position:fixed;inset:0;background:#0007;z-index:30}
@@ -35,7 +35,7 @@
   .container{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
   .card{background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:16px;padding:14px}
   .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
-  .col{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 160px}
+  .col{display:flex;flex-direction:column;gap:6px;min-width:180px;flex:1}
   label{color:var(--muted);font-size:.9rem}
   input, textarea, select{background:#0e1220;border:1px solid var(--border);border-radius:12px;color:var(--text);padding:10px 12px;outline:none}
   textarea{min-height:84px;resize:vertical}
@@ -73,33 +73,7 @@
   .part-card img{width:100%;height:160px;object-fit:cover;border-radius:10px;border:1px solid var(--border);background:#0b0f1b}
   .part-card .title{font-weight:600}
   .part-card .meta{color:var(--muted);font-size:.9rem}
-  /* ---- Additive improvements ---- */
-  /* Focus rings */
-  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 2px rgba(31,111,235,.2)}
-  /* Button hover / disabled */
-  .btn{transition:filter .15s}
-  .btn:hover{filter:brightness(1.15)}
-  .btn:active{filter:brightness(.9)}
-  .btn:disabled,.btn[disabled]{opacity:.5;cursor:not-allowed;filter:none}
-  /* Missing utility classes used in JS */
-  .tiny{font-size:.82rem;color:var(--muted)}
-  .note{font-size:.82rem;color:var(--muted);margin-top:6px}
-  /* Stock card actions wrap on narrow screens */
-  .stock-right{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
-  /* Sidebar nav button full-width + hover */
-  .menu button{display:block;width:100%;text-align:left;transition:background .15s}
-  .menu button:hover{background:#131829}
-  .menu button.active{border-color:var(--brand-2)}
-  /* Smaller grid cells on phones */
-  @media(max-width:600px){
-    .page{padding:10px}
-    .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-  }
-  /* Card headings */
-  .card h3{margin:0 0 10px;font-size:.95rem;font-weight:600;color:#cdd9ff}
-  /* Part card hover */
-  .part-card:hover{border-color:#2a3148;background:#111829}
-  .part-card{transition:border-color .15s,background .15s}
+
 </style>
 </head>
 <body>
@@ -112,7 +86,7 @@
       <small>PAGES</small>
       <button id="nav-add" class="active" onclick="showPage('add')">➕ Add Component</button>
       <button id="nav-kiosk" onclick="showPage('kiosk')">🗂️ Kiosk (Stock)</button>
-      <button id="nav-search" onclick="showPage('search')">🔎 Search</button>
+        <button id="nav-search" onclick="showPage('search')">🔎 Search</button>
     </div>
   </aside>
 
@@ -152,11 +126,11 @@
         <div class="card">
           <h3 style="margin:0 0 10px 0;">AI Suggest (optional)</h3>
           <div class="row">
-            <div class="col">
+            <div class="col" style="min-width:260px">
               <label>Prompt</label>
               <textarea id="aiPrompt" placeholder="e.g. M3x22 A2 DIN 912; BC548; RJ45 CAT6 shielded pass-through"></textarea>
             </div>
-            <div class="col">
+            <div class="col" style="min-width:220px">
               <label>&nbsp;</label>
               <div class="row" style="gap:8px;align-items:center;">
                 <button id="aiSuggest" class="btn">AI Suggest</button>
@@ -192,7 +166,7 @@
             </div>
           </div>
           <div class="row">
-            <div class="col">
+            <div class="col" style="min-width:150px">
               <label>Initial Qty (optional)</label>
               <input id="newQty" type="number" step="0.01" placeholder="100" />
             </div>
@@ -213,11 +187,11 @@
         <div class="card">
           <h3 style="margin:0 0 10px 0;">Upload Image (thumbnail)</h3>
           <div class="row">
-            <div class="col">
+            <div class="col" style="min-width:240px">
               <label>Target Part ID</label>
               <input id="uploadPartId" placeholder="Auto-fills when you select/create a part" />
             </div>
-            <div class="col">
+            <div class="col" style="min-width:240px">
               <label>Image file (camera)</label>
               <input id="uploadFile" type="file" accept="image/*" capture="environment" />
               <small class="muted">On iOS, choose “Take Photo” after tapping.</small>
@@ -384,7 +358,7 @@
       const q = inputEl.value.trim();
       if(timer) clearTimeout(timer);
       if(!q){ listEl.innerHTML=''; wrap.classList.remove('open'); return; }
-      timer = setTimeout(async ()=>{ // 250ms debounce
+      timer = setTimeout(async ()=>{
         try{
           const items = await onQuery(q);
           if(!items.length){ listEl.innerHTML = `<div class="dropdown-item muted">No results</div>`; wrap.classList.add('open'); return; }
@@ -394,7 +368,7 @@
           listEl.innerHTML = `<div class="dropdown-item muted">Error: ${e.message}</div>`;
           wrap.classList.add('open');
         }
-      }, 250);
+      }, 150);
     });
     listEl.addEventListener('click', (e)=>{
       const item = e.target.closest('.dropdown-item');
@@ -466,7 +440,6 @@
   aiBtn.onclick = async ()=>{
     const prompt = aiPromptEl.value.trim();
     if(!prompt){ aiStatus.textContent = 'Type something first.'; return; }
-    aiBtn.disabled = true;
     aiStatus.textContent = 'Thinking…';
     try{
       const r = await fetch('/api/ai/suggest-part', {
@@ -489,8 +462,6 @@
       aiStatus.textContent = '✅ Suggested. Review, then Create.';
     }catch(e){
       aiStatus.textContent = '❌ ' + e.message;
-    }finally{
-      aiBtn.disabled = false;
     }
   };
 
@@ -563,7 +534,6 @@
     const location_id = document.getElementById('locId').value.trim();
 
     if(!name){ createStatus.textContent='❌ Name required'; return; }
-    btnCreate.disabled = true;
     createStatus.textContent = 'Saving…';
 
     const fd = new FormData();
@@ -589,8 +559,6 @@
       openPrintModal(j.pk);
     }catch(e){
       createStatus.textContent = '❌ ' + e.message;
-    }finally{
-      btnCreate.disabled = false;
     }
   };
 
@@ -603,7 +571,6 @@
     const file = document.getElementById('uploadFile').files[0];
     if(!pid){ uploadStatus.textContent='❌ Part ID required'; return; }
     if(!file){ uploadStatus.textContent='❌ Pick an image'; return; }
-    btnUpload.disabled = true;
     uploadStatus.textContent = 'Uploading…';
 
     const fd = new FormData();
@@ -625,8 +592,6 @@
       }
     }catch(e){
       uploadStatus.textContent = '❌ ' + e.message;
-    }finally{
-      btnUpload.disabled = false;
     }
   };
 
@@ -702,13 +667,15 @@ async function loadKioskPart(pk, label){
             ${it.batch ? `<div class="muted">Batch: ${it.batch}</div>` : ``}
             ${it.serial ? `<div class="muted">Serial: ${it.serial}</div>` : ``}
           </div>
-          <div class="stock-right">
+          <div class="right" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <!-- ✅ checkbox to select this stock item for printing -->
             <label class="pill" style="display:flex;align-items:center;gap:6px">
               <input type="checkbox" class="chk" value="${id}"> Print
             </label>
-            <input class="pill" style="width:100px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
+
+            <input class="pill" style="width:110px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
             <button class="btn warn" id="btn-rm-${id}">Remove</button>
-            <input class="pill" style="width:100px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
+            <input class="pill" style="width:110px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
             <button class="btn ok" id="btn-ad-${id}">Add</button>
           </div>
         `;
@@ -735,7 +702,7 @@ async function loadKioskPart(pk, label){
       await apiPOST(url, {stock_id: stockId, quantity: qty, notes: 'Kiosk adjust'});
       await refreshStock(document.getElementById('kioskPartId').value);
     }catch(e){
-      kioskStatus.textContent = '❌ Adjust failed: ' + e.message;
+      alert('Adjust failed: ' + e.message);
     }
   }
 
@@ -890,8 +857,8 @@ async function loadKioskPart(pk, label){
       sel.innerHTML = '<option value="">(default)</option>';
       (data||[]).forEach(p=>{
         const o = document.createElement('option');
-        o.value = p.key;
-        o.textContent = p.name;
+        o.value = p.pk;
+        o.textContent = `${p.name}`;
         sel.appendChild(o);
       });
     }catch(e){ /* ignore */ }
@@ -921,6 +888,7 @@ async function loadKioskPart(pk, label){
     const model = document.getElementById('label-model').value;
     const templateId = Number(document.getElementById('label-template').value);
     const pluginVal = document.getElementById('label-plugin').value;
+    const pluginId = pluginVal ? Number(pluginVal) : null;
 
     if(!templateId){ status.textContent = 'Pick a template'; return; }
 
@@ -944,7 +912,7 @@ async function loadKioskPart(pk, label){
     status.textContent = 'Sending print job...';
     try{
       const body = { template_id: templateId, items: items };
-      if(pluginVal) body.plugin_key = pluginVal;
+      if(pluginId !== null) body.plugin_id = pluginId;
       const res = await fetch('/api/labels/print', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
