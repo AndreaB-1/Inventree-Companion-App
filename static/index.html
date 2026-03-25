@@ -11,69 +11,131 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
   a{color:var(--brand)}
+
+  /* ---- Layout ---- */
   .app{display:grid;grid-template-columns:260px 1fr;min-height:100dvh}
-  @media (max-width: 900px){
+  @media (max-width:900px){
     .app{grid-template-columns:1fr}
-    .sidebar{position:fixed;inset:0 40% 0 0;transform:translateX(-100%);transition:transform .2s;z-index:40}
+    .sidebar{position:fixed;inset:0 30% 0 0;transform:translateX(-100%);transition:transform .25s ease;z-index:40}
     .sidebar.open{transform:translateX(0)}
     .backdrop{display:none}
-    .sidebar.open + .backdrop{display:block;position:fixed;inset:0;background:#0007;z-index:30}
+    .sidebar.open ~ .backdrop{display:block;position:fixed;inset:0;background:#0008;backdrop-filter:blur(1px);z-index:30}
   }
-  header{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+  @media (max-width:480px){
+    .sidebar{inset:0 15% 0 0}
+  }
+
+  /* ---- Header ---- */
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+  header .title{font-weight:600;color:#cdd9ff;font-size:.95rem}
+  header .subtitle{color:var(--muted);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hamb{display:none}
   @media (max-width:900px){
-    .hamb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer}
+    .hamb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex-shrink:0;border:1px solid var(--border);border-radius:10px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer;font-size:1rem;transition:background .15s}
+    .hamb:hover{background:#131829}
   }
-  .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:14px;z-index:40}
-  .logo{font-weight:700;color:#cdd9ff;letter-spacing:.3px;margin-bottom:10px}
-  .menu{display:flex;flex-direction:column;gap:6px}
-  .menu button{all:unset;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer}
-  .menu button.active{background:linear-gradient(180deg,#0e1424,#0b1020);}
-  .menu small{display:block;color:var(--muted);margin:6px 2px 2px}
 
-  .page{padding:18px}
+  /* ---- Sidebar ---- */
+  .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:14px;z-index:40;overflow-y:auto}
+  .logo{font-weight:700;color:#cdd9ff;letter-spacing:.3px;margin-bottom:12px;font-size:1rem}
+  .menu{display:flex;flex-direction:column;gap:6px}
+  .menu button{all:unset;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer;transition:background .15s,border-color .15s;display:block;width:100%}
+  .menu button:hover{background:#131829}
+  .menu button.active{background:linear-gradient(180deg,#0e1424,#0b1020);border-color:var(--brand-2)}
+  .menu small{display:block;color:var(--muted);font-size:.78rem;letter-spacing:.05em;margin:8px 2px 4px;text-transform:uppercase}
+
+  /* ---- Page / Card / Layout ---- */
+  .page{padding:16px}
+  @media (max-width:600px){.page{padding:10px}}
   .container{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-  .card{background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .card{background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:16px;padding:16px}
+  .card-title{font-weight:600;font-size:.95rem;color:#cdd9ff;margin:0 0 12px}
   .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
-  .col{display:flex;flex-direction:column;gap:6px;min-width:180px;flex:1}
-  label{color:var(--muted);font-size:.9rem}
-  input, textarea, select{background:#0e1220;border:1px solid var(--border);border-radius:12px;color:var(--text);padding:10px 12px;outline:none}
+  .col{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 160px}
+  .col-auto{display:flex;flex-direction:column;gap:6px}
+
+  /* ---- Form elements ---- */
+  label{color:var(--muted);font-size:.88rem}
+  input,textarea,select{
+    background:#0e1220;border:1px solid var(--border);border-radius:10px;
+    color:var(--text);padding:9px 12px;outline:none;width:100%;
+    transition:border-color .15s,box-shadow .15s;font-size:.9rem
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--brand-2);box-shadow:0 0 0 2px rgba(31,111,235,.2)}
+  input[readonly]{color:var(--muted);cursor:default}
   textarea{min-height:84px;resize:vertical}
-  .btn{all:unset;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:12px;border:1px solid #0b1222;background:linear-gradient(180deg,#0e1424,#0b1020);cursor:pointer}
+  input[type=file]{padding:6px 10px;cursor:pointer}
+  input[type=checkbox]{width:auto;padding:0}
+
+  /* ---- Buttons ---- */
+  .btn{
+    all:unset;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px 16px;border-radius:10px;border:1px solid #1a2040;
+    background:linear-gradient(180deg,#131828,#0c1020);
+    cursor:pointer;font-size:.88rem;white-space:nowrap;
+    transition:opacity .15s,filter .15s;
+  }
+  .btn:hover{filter:brightness(1.15)}
+  .btn:active{filter:brightness(.9)}
+  .btn:disabled,.btn[disabled]{opacity:.5;cursor:not-allowed;filter:none}
   .btn.primary{background:linear-gradient(180deg,#1a2a4a,#12213f);border-color:#1b2b4b}
   .btn.ok{background:linear-gradient(180deg,#0f3a22,#0c2f1c);border-color:#125a2d}
   .btn.warn{background:linear-gradient(180deg,#3a1212,#2a0e0e);border-color:#5a1a1a}
+
+  /* ---- Text helpers ---- */
   .muted{color:var(--muted)}
-  .status{font-size:.92rem}
-  .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0e1220;color:var(--muted);font-size:.86rem}
-  .thumb{width:110px;height:110px;border-radius:12px;background:#0e1220;border:1px solid var(--border);object-fit:cover}
+  .ok-text{color:var(--ok)}
+  .err-text{color:var(--err)}
+  .status{font-size:.9rem;min-height:1.2em}
+  .tiny{font-size:.82rem;color:var(--muted)}
+  .note{font-size:.82rem;color:var(--muted);margin-top:8px}
+
+  /* ---- Pill / badge ---- */
+  .pill{padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:#0e1220;color:var(--muted);font-size:.84rem;display:inline-block}
+
+  /* ---- Thumbnail ---- */
+  .thumb{width:100px;height:100px;border-radius:12px;background:#0e1220;border:1px solid var(--border);object-fit:cover;display:block}
+  .thumb.clickable{cursor:zoom-in}
+
+  /* ---- Stock list ---- */
   .list{display:flex;flex-direction:column;gap:10px}
-  .stock-card{display:flex;gap:12px;align-items:flex-start;border:1px dashed var(--border);border-radius:12px;padding:10px}
+  .stock-card{border:1px dashed var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .stock-card-info{display:flex;flex-direction:column;gap:4px}
+  .stock-card-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .stock-input{width:100px!important;flex-shrink:0}
   .grow{flex:1}
-  .right{margin-left:auto}
+
+  /* ---- Dropdown ---- */
   .dropdown{position:relative}
-  .dropdown-list{position:absolute;z-index:10;left:0;right:0;top:100%;max-height:280px;overflow:auto;background:#0e1220;border:1px solid var(--border);border-radius:12px;margin-top:6px;padding:6px;display:none}
+  .dropdown-list{position:absolute;z-index:10;left:0;right:0;top:calc(100% + 4px);max-height:280px;overflow:auto;background:#0e1220;border:1px solid var(--border);border-radius:12px;padding:6px;display:none;box-shadow:0 8px 24px #0006}
   .dropdown.open .dropdown-list{display:block}
-  .dropdown-item{padding:8px;border-radius:8px;cursor:pointer}
+  .dropdown-item{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:.9rem}
   .dropdown-item:hover{background:#171b29}
-  /* Modal for print confirm */
+
+  /* ---- Modal ---- */
   .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:60}
   .modal.show{display:flex}
-  .modal::before{content:"";position:absolute;inset:0;background:#0009;backdrop-filter:blur(2px)}
-  .modal .box{position:relative;background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:14px;padding:16px 18px;max-width:420px;width:92%}
-  .modal h3{margin:0 0 8px 0}
-  .modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
-  /* Image lightbox */
-  .thumb.clickable { cursor: zoom-in; }
-  #imgModal .box { background: transparent; border: 0; padding: 0; }
-  #imgModal img { max-width: 90vw; max-height: 90vh; display: block; border-radius: 12px; box-shadow: 0 6px 40px #000a; }
-  /* Search grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-  .part-card{background:#0e1220;border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
-  .part-card img{width:100%;height:160px;object-fit:cover;border-radius:10px;border:1px solid var(--border);background:#0b0f1b}
-  .part-card .title{font-weight:600}
-  .part-card .meta{color:var(--muted);font-size:.9rem}
+  .modal::before{content:"";position:absolute;inset:0;background:#000a;backdrop-filter:blur(3px)}
+  .modal .box{position:relative;background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:14px;padding:18px 20px;max-width:440px;width:92%;box-shadow:0 16px 48px #0008}
+  .modal h3{margin:0 0 8px;font-size:1rem}
+  .modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
 
+  /* ---- Lightbox ---- */
+  #imgModal .box{background:transparent;border:0;padding:0}
+  #imgModal img{max-width:90vw;max-height:90vh;display:block;border-radius:12px;box-shadow:0 8px 48px #000c}
+
+  /* ---- Search grid ---- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  @media (max-width:480px){.grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}}
+  .part-card{background:#0e1220;border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:border-color .15s,background .15s}
+  .part-card:hover{background:#131829;border-color:#2d3348}
+  .part-card img{width:100%;height:150px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:#0b0f1b}
+  .part-card .title{font-weight:600;font-size:.9rem}
+  .part-card .meta{color:var(--muted);font-size:.84rem}
+
+  /* ---- Print labels panel ---- */
+  .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  select{appearance:auto}
 </style>
 </head>
 <body>
@@ -86,183 +148,187 @@
       <small>PAGES</small>
       <button id="nav-add" class="active" onclick="showPage('add')">➕ Add Component</button>
       <button id="nav-kiosk" onclick="showPage('kiosk')">🗂️ Kiosk (Stock)</button>
-        <button id="nav-search" onclick="showPage('search')">🔎 Search</button>
+      <button id="nav-search" onclick="showPage('search')">🔎 Search</button>
     </div>
   </aside>
 
   <!-- Main -->
   <main>
     <header>
-      <button class="hamb" onclick="toggleSidebar()">☰</button>
-      <div class="muted">Open on phone via <code>http://SERVER:8000/</code></div>
+      <button class="hamb" onclick="toggleSidebar()" aria-label="Open menu">☰</button>
+      <div>
+        <div class="title">InvenTree Companion</div>
+        <div class="subtitle">Access at <code>http://SERVER:8000/</code></div>
+      </div>
     </header>
 
     <!-- ADD PAGE -->
     <section id="page-add" class="page">
       <div class="container">
         <!-- Part Search -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Select Existing Part (optional)</h3>
-          <div class="row">
-            <div class="col dropdown" id="partSearchWrap">
-              <label>Search part (name or IPN)</label>
-              <input id="partSearch" placeholder="Type to search…" autocomplete="off" />
-              <div id="partSearchList" class="dropdown-list"></div>
-              <small class="muted" id="partSearchStatus"></small>
+        <div class=”card”>
+          <p class=”card-title”>Select Existing Part <span class=”muted” style=”font-weight:400”>(optional)</span></p>
+          <div class=”row”>
+            <div class=”col dropdown” id=”partSearchWrap”>
+              <label>Search by name or IPN</label>
+              <input id=”partSearch” placeholder=”Type to search…” autocomplete=”off” />
+              <div id=”partSearchList” class=”dropdown-list”></div>
+              <small class=”muted” id=”partSearchStatus”></small>
             </div>
-            <div class="col">
+            <div class=”col”>
               <label>Selected Part</label>
-              <input id="selectedPartLabel" readonly placeholder="None" />
-              <input type="hidden" id="selectedPartId" />
+              <input id=”selectedPartLabel” readonly placeholder=”None” />
+              <input type=”hidden” id=”selectedPartId” />
             </div>
-            <div class="col" style="max-width:140px">
+            <div class=”col-auto”>
               <label>Image</label>
-              <img id="selectedPartThumb" class="thumb" alt="No image" />
+              <img id=”selectedPartThumb” class=”thumb” alt=”No image” />
             </div>
           </div>
         </div>
 
         <!-- AI Suggest -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">AI Suggest (optional)</h3>
-          <div class="row">
-            <div class="col" style="min-width:260px">
+        <div class=”card”>
+          <p class=”card-title”>AI Suggest <span class=”muted” style=”font-weight:400”>(optional)</span></p>
+          <div class=”row”>
+            <div class=”col”>
               <label>Prompt</label>
-              <textarea id="aiPrompt" placeholder="e.g. M3x22 A2 DIN 912; BC548; RJ45 CAT6 shielded pass-through"></textarea>
+              <textarea id=”aiPrompt” placeholder=”e.g. M3x22 A2 DIN 912; BC548; RJ45 CAT6 shielded pass-through”></textarea>
             </div>
-            <div class="col" style="min-width:220px">
+            <div class=”col”>
               <label>&nbsp;</label>
-              <div class="row" style="gap:8px;align-items:center;">
-                <button id="aiSuggest" class="btn">AI Suggest</button>
-                <label class="muted" style="display:flex;align-items:center;gap:6px;">
-                  <input type="checkbox" id="aiNameOnly" /> Name only
+              <div class=”row” style=”gap:8px;align-items:center;flex-wrap:wrap”>
+                <button id=”aiSuggest” class=”btn”>AI Suggest</button>
+                <label class=”muted” style=”display:flex;align-items:center;gap:6px;cursor:pointer”>
+                  <input type=”checkbox” id=”aiNameOnly” /> Name only
                 </label>
-                <label class="muted" style="display:flex;align-items:center;gap:6px;">
-                  <input type="checkbox" id="aiStrict" checked /> Strict
+                <label class=”muted” style=”display:flex;align-items:center;gap:6px;cursor:pointer”>
+                  <input type=”checkbox” id=”aiStrict” checked /> Strict
                 </label>
               </div>
-              <div class="status" id="aiStatus"></div>
+              <div class=”status” id=”aiStatus”></div>
             </div>
           </div>
         </div>
 
         <!-- Create Part -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Create / Update Part</h3>
-          <div class="row">
-            <div class="col">
+        <div class=”card”>
+          <p class=”card-title”>Create / Update Part</p>
+          <div class=”row”>
+            <div class=”col”>
               <label>Name</label>
-              <input id="newName" placeholder="M3 × 22 – Socket Head Cap Screw A2" />
+              <input id=”newName” placeholder=”M3 × 22 – Socket Head Cap Screw A2” />
             </div>
-            <div class="col">
+            <div class=”col”>
               <label>IPN (optional)</label>
-              <input id="newIPN" placeholder="Internal Part Number" />
+              <input id=”newIPN” placeholder=”Internal Part Number” />
             </div>
           </div>
-          <div class="row">
-            <div class="col">
-              <label>Description</label>
-              <textarea id="newDesc" placeholder="M3 × 22 – Socket Head Cap Screw – DIN 912 – A2 Stainless Steel"></textarea>
+          <div class=”row”>
+            <div class=”col”>
+              <label>Description (optional)</label>
+              <textarea id=”newDesc” placeholder=”M3 × 22 – Socket Head Cap Screw – DIN 912 – A2 Stainless Steel”></textarea>
             </div>
           </div>
-          <div class="row">
-            <div class="col" style="min-width:150px">
+          <div class=”row”>
+            <div class=”col”>
               <label>Initial Qty (optional)</label>
-              <input id="newQty" type="number" step="0.01" placeholder="100" />
+              <input id=”newQty” type=”number” step=”0.01” placeholder=”100” inputmode=”decimal” />
             </div>
-            <div class="col dropdown" id="locSearchWrap">
+            <div class=”col dropdown” id=”locSearchWrap”>
               <label>Location (for initial qty)</label>
-              <input id="locSearch" placeholder="Type to search location…" autocomplete="off" />
-              <div id="locSearchList" class="dropdown-list"></div>
-              <input type="hidden" id="locId" />
+              <input id=”locSearch” placeholder=”Type to search location…” autocomplete=”off” />
+              <div id=”locSearchList” class=”dropdown-list”></div>
+              <input type=”hidden” id=”locId” />
             </div>
           </div>
-          <div class="row" style="gap:8px;align-items:center;">
-            <button class="btn primary" id="btnCreate">Create Part</button>
-            <span id="createStatus" class="status"></span>
+          <div class=”row” style=”margin-top:4px;align-items:center”>
+            <button class=”btn primary” id=”btnCreate”>Create Part</button>
+            <span id=”createStatus” class=”status”></span>
           </div>
         </div>
 
         <!-- Upload Image -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Upload Image (thumbnail)</h3>
-          <div class="row">
-            <div class="col" style="min-width:240px">
+        <div class=”card”>
+          <p class=”card-title”>Upload Image (thumbnail)</p>
+          <div class=”row”>
+            <div class=”col”>
               <label>Target Part ID</label>
-              <input id="uploadPartId" placeholder="Auto-fills when you select/create a part" />
+              <input id=”uploadPartId” placeholder=”Auto-fills when you select/create a part” />
             </div>
-            <div class="col" style="min-width:240px">
-              <label>Image file (camera)</label>
-              <input id="uploadFile" type="file" accept="image/*" capture="environment" />
-              <small class="muted">On iOS, choose “Take Photo” after tapping.</small>
+            <div class=”col”>
+              <label>Image file (camera or file)</label>
+              <input id=”uploadFile” type=”file” accept=”image/*” capture=”environment” />
+              <small class=”muted”>On iOS, choose “Take Photo” after tapping.</small>
             </div>
           </div>
-          <div class="row" style="gap:8px;align-items:center;">
-            <button class="btn" id="btnUpload">Upload</button>
-            <span id="uploadStatus" class="status"></span>
+          <div class=”row” style=”margin-top:4px;align-items:center”>
+            <button class=”btn” id=”btnUpload”>Upload</button>
+            <span id=”uploadStatus” class=”status”></span>
           </div>
         </div>
       </div>
     </section>
 
     <!-- KIOSK PAGE -->
-    <section id="page-kiosk" class="page" hidden>
-      <div class="container">
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Find Part</h3>
-          <div class="row">
-            <div class="col dropdown" id="kioskSearchWrap">
+    <section id=”page-kiosk” class=”page” hidden>
+      <div class=”container”>
+        <div class=”card”>
+          <p class=”card-title”>Find Part</p>
+          <div class=”row”>
+            <div class=”col dropdown” id=”kioskSearchWrap”>
               <label>Part (name/IPN or ID)</label>
-              <input id="kioskQuery" placeholder="Start typing… or paste Part ID" autocomplete="off" />
-              <div id="kioskSearchList" class="dropdown-list"></div>
-              <small class="muted" id="kioskStatus"></small>
+              <input id=”kioskQuery” placeholder=”Start typing… or paste Part ID” autocomplete=”off” />
+              <div id=”kioskSearchList” class=”dropdown-list”></div>
+              <small class=”muted” id=”kioskStatus”></small>
             </div>
-            <div class="col">
+            <div class=”col”>
               <label>Selected Part</label>
-              <input id="kioskPartLabel" readonly />
-              <input type="hidden" id="kioskPartId" />
+              <input id=”kioskPartLabel” readonly placeholder=”None” />
+              <input type=”hidden” id=”kioskPartId” />
             </div>
-            <div class="col" style="max-width:140px">
+            <div class=”col-auto”>
               <label>Image</label>
-              <img id="kioskThumb" class="thumb" alt="No image" />
+              <img id=”kioskThumb” class=”thumb” alt=”No image” />
             </div>
           </div>
         </div>
 
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Stock Items</h3>
-          <div id="stockList" class="list"></div>
-          <div id="stockEmpty" class="muted">No stock items yet.</div>
+        <div class=”card”>
+          <p class=”card-title”>Stock Items</p>
+          <div id=”stockList” class=”list”></div>
+          <div id=”stockEmpty” class=”muted”>No part selected.</div>
         </div>
-        <!-- Print Labels (NEW) -->
-        <div class="card" id="print-card" style="display:none">
-          <h3 style="margin-top:0">Print Labels</h3>
-          <div class="row">
-            <div>
+
+        <!-- Print Labels -->
+        <div class=”card” id=”print-card” style=”display:none”>
+          <p class=”card-title”>Print Labels</p>
+          <div class=”row”>
+            <div class=”col”>
               <label>Model Type</label>
-              <select id="label-model">
-                <option value="stockitem">stockitem</option>
-                <option value="part">part</option>
-                <option value="stocklocation">stocklocation</option>
+              <select id=”label-model”>
+                <option value=”stockitem”>Stock Item</option>
+                <option value=”part”>Part</option>
+                <option value=”stocklocation”>Stock Location</option>
               </select>
             </div>
-            <div>
+            <div class=”col”>
               <label>Label Template</label>
-              <select id="label-template"></select>
+              <select id=”label-template”></select>
             </div>
-            <div>
-              <label>Printer Plugin (optional)</label>
-              <select id="label-plugin">
-                <option value="">(default)</option>
+            <div class=”col”>
+              <label>Printer Plugin</label>
+              <select id=”label-plugin”>
+                <option value=””>(default)</option>
               </select>
             </div>
           </div>
-          <div class="actions">
-            <button class="btn" id="btn-load-templates">↻ Refresh Templates</button>
-            <button class="btn" id="btn-print">🖨️ Print</button>
+          <div class=”actions”>
+            <button class=”btn” id=”btn-load-templates”>↻ Refresh</button>
+            <button class=”btn primary” id=”btn-print”>🖨️ Print</button>
           </div>
-          <div class="tiny note">Select stock rows (to print stockitem labels), or switch to “part” to print the current part.</div>
-          <div id="print-status" class="tiny"></div>
+          <p class=”note”>Select stock rows to print stock item labels, or switch model to “Part” to print for the current part.</p>
+          <div id=”print-status” class=”tiny” style=”margin-top:6px”></div>
         </div>
       </div>
     </section>
@@ -270,24 +336,23 @@
     <section id="page-search" class="page" hidden>
       <div class="container">
         <div class="card">
-          <h3 style="margin:0 0 10px 0;">Search Parts</h3>
-          <div class="row">
+          <p class="card-title">Search Parts</p>
+          <div class="row" style="align-items:flex-end">
             <div class="col">
               <label>Search</label>
-              <input id="searchInput" placeholder="Type words (space-separated) and press Enter" autocomplete="off" />
-              <small class="muted">Matches parts that contain <em>all</em> words in any order. Leave blank to browse all.</small>
+              <input id="searchInput" placeholder="Type words separated by spaces…" autocomplete="off" />
+              <small class="muted">All words must match (AND). Leave blank to browse all.</small>
             </div>
-            <div class="col" style="max-width:160px">
-              <label>&nbsp;</label>
+            <div class="col-auto">
               <button class="btn" id="btnSearchGo">Search</button>
             </div>
           </div>
         </div>
 
         <div class="card">
-          <div id="searchStatus" class="muted"></div>
+          <div id="searchStatus" class="muted" style="margin-bottom:10px;min-height:1.2em"></div>
           <div id="searchGrid" class="grid"></div>
-          <div style="margin-top:10px;display:flex;justify-content:center">
+          <div style="margin-top:12px;display:flex;justify-content:center">
             <button class="btn" id="btnSearchMore" style="display:none">Load more</button>
           </div>
         </div>
@@ -300,10 +365,10 @@
 <div id="printConfirmModal" class="modal" aria-hidden="true">
   <div class="box">
     <h3>Print label?</h3>
-    <p class="muted">Print a part label for this newly created item using your default printer?</p>
+    <p class="muted" style="margin:0 0 4px">Print a part label for this newly created item using your default printer?</p>
     <div class="actions">
-      <button class="btn" id="modalNo">No</button>
-      <button class="btn ok" id="modalYes">Print</button>
+      <button class="btn" id="modalNo">Skip</button>
+      <button class="btn ok" id="modalYes">🖨️ Print</button>
     </div>
   </div>
 </div>
@@ -314,6 +379,9 @@
   </div>
 </div>
 <script>
+  // ---------- Escape helper (used everywhere) ----------
+  function esc(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
   // ---------- Layout ----------
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('backdrop');
@@ -362,13 +430,13 @@
         try{
           const items = await onQuery(q);
           if(!items.length){ listEl.innerHTML = `<div class="dropdown-item muted">No results</div>`; wrap.classList.add('open'); return; }
-          listEl.innerHTML = items.map(it => `<div class="dropdown-item" data-pk="${it.pk}">${it.label}</div>`).join('');
+          listEl.innerHTML = items.map(it => `<div class="dropdown-item" data-pk="${it.pk}">${esc(it.label)}</div>`).join('');
           wrap.classList.add('open');
         }catch(e){
-          listEl.innerHTML = `<div class="dropdown-item muted">Error: ${e.message}</div>`;
+          listEl.innerHTML = `<div class="dropdown-item muted">Error: ${esc(e.message)}</div>`;
           wrap.classList.add('open');
         }
-      }, 150);
+      }, 250);
     });
     listEl.addEventListener('click', (e)=>{
       const item = e.target.closest('.dropdown-item');
@@ -440,6 +508,7 @@
   aiBtn.onclick = async ()=>{
     const prompt = aiPromptEl.value.trim();
     if(!prompt){ aiStatus.textContent = 'Type something first.'; return; }
+    aiBtn.disabled = true;
     aiStatus.textContent = 'Thinking…';
     try{
       const r = await fetch('/api/ai/suggest-part', {
@@ -462,6 +531,8 @@
       aiStatus.textContent = '✅ Suggested. Review, then Create.';
     }catch(e){
       aiStatus.textContent = '❌ ' + e.message;
+    }finally{
+      aiBtn.disabled = false;
     }
   };
 
@@ -534,6 +605,7 @@
     const location_id = document.getElementById('locId').value.trim();
 
     if(!name){ createStatus.textContent='❌ Name required'; return; }
+    btnCreate.disabled = true;
     createStatus.textContent = 'Saving…';
 
     const fd = new FormData();
@@ -559,6 +631,8 @@
       openPrintModal(j.pk);
     }catch(e){
       createStatus.textContent = '❌ ' + e.message;
+    }finally{
+      btnCreate.disabled = false;
     }
   };
 
@@ -571,6 +645,7 @@
     const file = document.getElementById('uploadFile').files[0];
     if(!pid){ uploadStatus.textContent='❌ Part ID required'; return; }
     if(!file){ uploadStatus.textContent='❌ Pick an image'; return; }
+    btnUpload.disabled = true;
     uploadStatus.textContent = 'Uploading…';
 
     const fd = new FormData();
@@ -592,6 +667,8 @@
       }
     }catch(e){
       uploadStatus.textContent = '❌ ' + e.message;
+    }finally{
+      btnUpload.disabled = false;
     }
   };
 
@@ -661,34 +738,39 @@ async function loadKioskPart(pk, label){
         const row = document.createElement('div');
         row.className = 'stock-card';
         row.innerHTML = `
-          <div class="grow">
-            <div><strong>Stock #${id}</strong> — <span class="pill">${(it.location_path||'No location')}</span></div>
-            <div class="muted">Qty: <strong>${it.quantity}</strong></div>
-            ${it.batch ? `<div class="muted">Batch: ${it.batch}</div>` : ``}
-            ${it.serial ? `<div class="muted">Serial: ${it.serial}</div>` : ``}
+          <div class="stock-card-info">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+              <strong>Stock #${id}</strong>
+              <span class="pill">${esc(it.location_path||'No location')}</span>
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+                <input type="checkbox" class="chk" value="${id}"> <span class="muted" style="font-size:.85rem">Print</span>
+              </label>
+            </div>
+            <div class="muted">Qty: <strong style="color:var(--text)">${it.quantity}</strong></div>
+            ${it.batch ? `<div class="muted">Batch: ${esc(String(it.batch))}</div>` : ``}
+            ${it.serial ? `<div class="muted">Serial: ${esc(String(it.serial))}</div>` : ``}
           </div>
-          <div class="right" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <!-- ✅ checkbox to select this stock item for printing -->
-            <label class="pill" style="display:flex;align-items:center;gap:6px">
-              <input type="checkbox" class="chk" value="${id}"> Print
-            </label>
-
-            <input class="pill" style="width:110px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
+          <div class="stock-card-actions">
+            <input class="pill stock-input" placeholder="Remove qty" inputmode="decimal" id="rm-${id}">
             <button class="btn warn" id="btn-rm-${id}">Remove</button>
-            <input class="pill" style="width:110px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
+            <input class="pill stock-input" placeholder="Add qty" inputmode="decimal" id="ad-${id}">
             <button class="btn ok" id="btn-ad-${id}">Add</button>
           </div>
         `;
         stockList.appendChild(row);
-        document.getElementById(`btn-rm-${id}`).onclick = async ()=>{
+        document.getElementById(`btn-rm-${id}`).onclick = async (e)=>{
           const v = parseFloat((document.getElementById(`rm-${id}`).value||'').replace(',', '.'));
           if(!(v>0)) return;
+          e.target.disabled = true;
           await adjustQty('remove', id, v);
+          e.target.disabled = false;
         };
-        document.getElementById(`btn-ad-${id}`).onclick = async ()=>{
+        document.getElementById(`btn-ad-${id}`).onclick = async (e)=>{
           const v = parseFloat((document.getElementById(`ad-${id}`).value||'').replace(',', '.'));
           if(!(v>0)) return;
+          e.target.disabled = true;
           await adjustQty('add', id, v);
+          e.target.disabled = false;
         };
       }
     }catch(e){
@@ -697,12 +779,13 @@ async function loadKioskPart(pk, label){
   }
 
   async function adjustQty(kind, stockId, qty){
+    const statusEl = document.getElementById('kioskStatus');
     try{
       const url = kind==='add' ? '/api/stock/add_qty' : '/api/stock/remove_qty';
       await apiPOST(url, {stock_id: stockId, quantity: qty, notes: 'Kiosk adjust'});
       await refreshStock(document.getElementById('kioskPartId').value);
     }catch(e){
-      alert('Adjust failed: ' + e.message);
+      if(statusEl) statusEl.textContent = '❌ Adjust failed: ' + e.message;
     }
   }
 
@@ -723,8 +806,6 @@ async function loadKioskPart(pk, label){
     _searchInit = true;
     resetSearch('');
   }
-
-  function esc(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
   function parseWords(q){
     return (q||'')
@@ -769,7 +850,7 @@ async function loadKioskPart(pk, label){
       searchState.offset = 0;
       searchState.done = false;
       searchGrid.innerHTML = '';
-      searchStatus.textContent = words.length ? `Searching for: ${words.join(' AND ')}` : 'Browsing all parts';
+      searchStatus.textContent = words.length ? `Searching: ${words.join(' AND ')} …` : 'Loading parts…';
     }
 
     searchState.loading = true;
@@ -825,6 +906,9 @@ async function loadKioskPart(pk, label){
 
       // Paging
       searchState.offset += page.length;
+      const total = searchGrid.children.length;
+      const query = searchState.q ? `"${searchState.q}"` : 'all parts';
+      searchStatus.textContent = `${total} result${total !== 1 ? 's' : ''} for ${query}`;
       btnSearchMore.style.display = (page.length >= searchState.limit) ? '' : 'none';
       if(page.length < searchState.limit){
         searchState.done = true;
@@ -857,8 +941,8 @@ async function loadKioskPart(pk, label){
       sel.innerHTML = '<option value="">(default)</option>';
       (data||[]).forEach(p=>{
         const o = document.createElement('option');
-        o.value = p.pk;
-        o.textContent = `${p.name}`;
+        o.value = p.key;
+        o.textContent = p.name;
         sel.appendChild(o);
       });
     }catch(e){ /* ignore */ }
@@ -888,7 +972,6 @@ async function loadKioskPart(pk, label){
     const model = document.getElementById('label-model').value;
     const templateId = Number(document.getElementById('label-template').value);
     const pluginVal = document.getElementById('label-plugin').value;
-    const pluginId = pluginVal ? Number(pluginVal) : null;
 
     if(!templateId){ status.textContent = 'Pick a template'; return; }
 
@@ -912,7 +995,7 @@ async function loadKioskPart(pk, label){
     status.textContent = 'Sending print job...';
     try{
       const body = { template_id: templateId, items: items };
-      if(pluginId !== null) body.plugin_id = pluginId;
+      if(pluginVal) body.plugin_key = pluginVal;
       const res = await fetch('/api/labels/print', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
