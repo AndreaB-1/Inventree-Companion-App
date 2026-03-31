@@ -79,7 +79,7 @@ def _resolve_default_label_plugin_id(api: InvenTreeAPI) -> int | None:
     Returns None if none found (server will use its own default).
     """
     try:
-        res = api.get("/plugin/", params={"active": True})
+        res = api.get("plugin/", params={"active": True})
         rows = res["results"] if isinstance(res, dict) and "results" in res else (res or [])
         # exact name match
         for p in rows:
@@ -100,7 +100,7 @@ def _resolve_label_plugin_key(api: InvenTreeAPI) -> Optional[str]:
     name contains 'LabelMachine'. Returns None if not found.
     """
     try:
-        res = api.get("/plugin/", params={"active": True})
+        res = api.get("plugin/", params={"active": True})
         rows = res["results"] if isinstance(res, dict) and "results" in res else (res or [])
         # exact name
         for p in rows:
@@ -126,7 +126,7 @@ def index():
 def part_by_ipn(ipn: str):
     try:
         api = inv_api()
-        res = api.get("/part/", params={"IPN": ipn})
+        res = api.get("part/", params={"IPN": ipn})
         rows = res["results"] if isinstance(res, dict) and "results" in res else res
         if not rows:
             raise HTTPException(status_code=404, detail="No part found")
@@ -142,7 +142,7 @@ def part_by_ipn(ipn: str):
 def part_by_id(pk: str):
     try:
         api = inv_api()
-        p = api.get(f"/part/{pk}/")
+        p = api.get(f"part/{pk}/")
         if not p or not p.get("pk"):
             raise HTTPException(status_code=404, detail="No part found")
         return {"pk": p.get("pk"), "name": p.get("name"), "ipn": p.get("IPN")}
@@ -160,7 +160,7 @@ def list_parts(q: Optional[str] = None, limit: int = 20, offset: int = 0):
         params = {"limit": limit, "offset": offset}
         if q:
             params["search"] = q
-        res = api.get("/part/", params=params)
+        res = api.get("part/", params=params)
         rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
         out = []
         for r in rows:
@@ -185,7 +185,7 @@ def list_locations(q: Optional[str] = None, limit: int = 20, offset: int = 0):
         params = {"limit": limit, "offset": offset}
         if q:
             params["search"] = q
-        res = api.get("/stock/location/", params=params)
+        res = api.get("stock/location/", params=params)
         rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
         return [
             {"pk": r.get("pk"), "name": r.get("name"), "path": r.get("pathstring") or r.get("name")}
@@ -211,7 +211,7 @@ def create_part(
         if ipn:
             data["IPN"] = ipn
 
-        created = api.post("/part/", data)
+        created = api.post("part/", data)
         if not isinstance(created, dict) or not created.get("pk"):
             raise HTTPException(status_code=400, detail=f"Unexpected response: {created}")
 
@@ -223,7 +223,7 @@ def create_part(
                 raise HTTPException(status_code=400, detail="location_id required when initial_qty is provided.")
             try:
                 stock_payload = {"part": part_pk, "quantity": float(initial_qty), "location": int(location_id)}
-                api.post("/stock/", stock_payload)
+                api.post("stock/", stock_payload)
                 stock_msg = f"Stock item created: {initial_qty} @ location {location_id}"
             except Exception as se:
                 stock_msg = f"Stock not created: {se}"
@@ -245,7 +245,7 @@ def part_image_url(pk: str):
     """
     try:
         api = inv_api()
-        p = api.get(f"/part/{pk}/")
+        p = api.get(f"part/{pk}/")
         if not p or not p.get("pk"):
             raise HTTPException(status_code=404, detail="Part not found")
 
@@ -471,7 +471,7 @@ def stock_by_part(part_id: int, limit: int = 250, offset: int = 0):
     try:
         api = inv_api()
         params = {"part": part_id, "limit": limit, "offset": offset}
-        res = api.get("/stock/", params=params)
+        res = api.get("stock/", params=params)
         rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
 
         # Build a small cache of locations to reduce calls
@@ -489,7 +489,7 @@ def stock_by_part(part_id: int, limit: int = 250, offset: int = 0):
             if isinstance(loc_id, int):
                 if loc_id not in loc_cache:
                     try:
-                        ld = api.get(f"/stock/location/{loc_id}/")
+                        ld = api.get(f"stock/location/{loc_id}/")
                         loc_cache[loc_id] = {
                             "name": ld.get("name"),
                             "path": ld.get("pathstring") or ld.get("name")
@@ -530,7 +530,7 @@ def stock_add_qty(req: StockAdjustReq):
             "items": [{"pk": int(req.stock_id), "quantity": str(req.quantity)}],
             "notes": req.notes or "Adjusted via companion app",
         }
-        api.post("/stock/add/", payload)
+        api.post("stock/add/", payload)
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -547,7 +547,7 @@ def stock_remove_qty(req: StockAdjustReq):
             "items": [{"pk": int(req.stock_id), "quantity": str(req.quantity)}],
             "notes": req.notes or "Adjusted via companion app",
         }
-        api.post("/stock/remove/", payload)
+        api.post("stock/remove/", payload)
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -724,7 +724,7 @@ def part_image_url(pk: str):
     """
     try:
         api = inv_api()
-        p = api.get(f"/part/{pk}/")
+        p = api.get(f"part/{pk}/")
         if not p or not p.get("pk"):
             raise HTTPException(status_code=404, detail="Part not found")
 
@@ -763,7 +763,7 @@ def part_image_proxy(pk: str, thumb: bool = False):
     """
     try:
         api = inv_api()
-        p = api.get(f"/part/{pk}/")
+        p = api.get(f"part/{pk}/")
         if not p or not p.get("pk"):
             raise HTTPException(status_code=404, detail="Part not found")
 
@@ -821,7 +821,7 @@ def label_templates(
             params["enabled"] = enabled
         if search:
             params["search"] = search
-        res = api.get("/label/template/", params=params)
+        res = api.get("label/template/", params=params)
         rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
         return [
             {
@@ -846,7 +846,7 @@ def plugins_with_label_mixin(active: Optional[bool] = True):
         if active is not None:
             params["active"] = active
         # Path is '/plugin/' (singular)
-        res = api.get("/plugin/", params=params)
+        res = api.get("plugin/", params=params)
         rows = res["results"] if isinstance(res, dict) and "results" in res else res or []
         return [
             {"pk": r.get("pk"), "key": r.get("key"), "name": r.get("name"), "active": r.get("active")}
@@ -904,7 +904,7 @@ def print_labels(payload: dict):
         if copies:
             body["copies"] = int(copies)
 
-        res = api.post("/label/print/", body)
+        res = api.post("label/print/", body)
         return {"ok": True, "result": res}
     except HTTPException:
         raise
