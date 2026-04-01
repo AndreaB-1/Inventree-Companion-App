@@ -1,943 +1,1011 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>InvenTree Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0f1115;--panel:#151921;--muted:#8b93a7;--text:#e7eaf1;--brand:#5aa6ff;--brand-2:#1f6feb;--ok:#22c55e;--err:#ef4444;--border:#232838;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-  a{color:var(--brand)}
-  .app{display:grid;grid-template-columns:260px 1fr;min-height:100dvh}
-  @media (max-width: 900px){
-    .app{grid-template-columns:1fr}
-    .sidebar{position:fixed;inset:0 40% 0 0;transform:translateX(-100%);transition:transform .2s;z-index:40}
-    .sidebar.open{transform:translateX(0)}
-    .backdrop{display:none}
-    .sidebar.open + .backdrop{display:block;position:fixed;inset:0;background:#0007;z-index:30}
-  }
-  header{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
-  .hamb{display:none}
-  @media (max-width:900px){
-    .hamb{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer}
-  }
-  .sidebar{background:var(--panel);border-right:1px solid var(--border);padding:14px;z-index:40}
-  .logo{font-weight:700;color:#cdd9ff;letter-spacing:.3px;margin-bottom:10px}
-  .menu{display:flex;flex-direction:column;gap:6px}
-  .menu button{all:unset;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#0e1220;box-shadow:0 0 0 1px #0a0d16 inset;cursor:pointer}
-  .menu button.active{background:linear-gradient(180deg,#0e1424,#0b1020);}
-  .menu small{display:block;color:var(--muted);margin:6px 2px 2px}
+:root {
+  --font-head: 'Syne', sans-serif;
+  --font-body: 'DM Mono', monospace;
+  --bg:#080c12; --surface:#0d1420; --surface-2:#111827; --surface-3:#161f30;
+  --border:#1e2a40; --border-hi:#2a3a58;
+  --text:#e4ebf5; --text-2:#8b9ab5; --text-3:#4a5a72;
+  --accent:#3b82f6; --accent-dim:rgba(59,130,246,.12); --accent-glow:rgba(59,130,246,.18);
+  --ok:#22c55e; --ok-dim:rgba(34,197,94,.12);
+  --err:#f43f5e; --err-dim:rgba(244,63,94,.12);
+  --warn:#f59e0b; --warn-dim:rgba(245,158,11,.12);
+  --nav-w:260px; --radius:14px; --radius-sm:8px; --radius-lg:20px;
+  --shadow:0 4px 24px rgba(0,0,0,.45); --shadow-sm:0 2px 10px rgba(0,0,0,.3);
+  --trans:.18s cubic-bezier(.4,0,.2,1); --trans-slow:.32s cubic-bezier(.4,0,.2,1);
+}
+[data-theme="light"] {
+  --bg:#f0f4fa; --surface:#ffffff; --surface-2:#f6f8fc; --surface-3:#edf1f8;
+  --border:#dce3f0; --border-hi:#c0cce0;
+  --text:#0f1928; --text-2:#5a6a88; --text-3:#9aaac0;
+  --accent:#2563eb; --accent-dim:rgba(37,99,235,.1); --accent-glow:rgba(37,99,235,.14);
+  --ok:#16a34a; --ok-dim:rgba(22,163,74,.1);
+  --err:#dc2626; --err-dim:rgba(220,38,38,.1);
+  --warn:#d97706; --warn-dim:rgba(217,119,6,.1);
+  --shadow:0 4px 24px rgba(0,0,0,.08); --shadow-sm:0 2px 10px rgba(0,0,0,.05);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);font-size:13.5px;line-height:1.55;
+  background:var(--bg);color:var(--text);
+  transition:background var(--trans-slow),color var(--trans-slow);
+  min-height:100dvh;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+input,textarea,select,button{font-family:inherit;font-size:inherit}
 
-  .page{padding:18px}
-  .container{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-  .card{background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:16px;padding:14px}
-  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
-  .col{display:flex;flex-direction:column;gap:6px;min-width:180px;flex:1}
-  label{color:var(--muted);font-size:.9rem}
-  input, textarea, select{background:#0e1220;border:1px solid var(--border);border-radius:12px;color:var(--text);padding:10px 12px;outline:none}
-  textarea{min-height:84px;resize:vertical}
-  .btn{all:unset;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:12px;border:1px solid #0b1222;background:linear-gradient(180deg,#0e1424,#0b1020);cursor:pointer}
-  .btn.primary{background:linear-gradient(180deg,#1a2a4a,#12213f);border-color:#1b2b4b}
-  .btn.ok{background:linear-gradient(180deg,#0f3a22,#0c2f1c);border-color:#125a2d}
-  .btn.warn{background:linear-gradient(180deg,#3a1212,#2a0e0e);border-color:#5a1a1a}
-  .muted{color:var(--muted)}
-  .status{font-size:.92rem}
-  .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0e1220;color:var(--muted);font-size:.86rem}
-  .thumb{width:110px;height:110px;border-radius:12px;background:#0e1220;border:1px solid var(--border);object-fit:cover}
-  .list{display:flex;flex-direction:column;gap:10px}
-  .stock-card{display:flex;gap:12px;align-items:flex-start;border:1px dashed var(--border);border-radius:12px;padding:10px}
-  .grow{flex:1}
-  .right{margin-left:auto}
-  .dropdown{position:relative}
-  .dropdown-list{position:absolute;z-index:10;left:0;right:0;top:100%;max-height:280px;overflow:auto;background:#0e1220;border:1px solid var(--border);border-radius:12px;margin-top:6px;padding:6px;display:none}
-  .dropdown.open .dropdown-list{display:block}
-  .dropdown-item{padding:8px;border-radius:8px;cursor:pointer}
-  .dropdown-item:hover{background:#171b29}
-  /* Modal for print confirm */
-  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:60}
-  .modal.show{display:flex}
-  .modal::before{content:"";position:absolute;inset:0;background:#0009;backdrop-filter:blur(2px)}
-  .modal .box{position:relative;background:linear-gradient(180deg,#111624,#0b0f1b);border:1px solid var(--border);border-radius:14px;padding:16px 18px;max-width:420px;width:92%}
-  .modal h3{margin:0 0 8px 0}
-  .modal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
-  /* Image lightbox */
-  .thumb.clickable { cursor: zoom-in; }
-  #imgModal .box { background: transparent; border: 0; padding: 0; }
-  #imgModal img { max-width: 90vw; max-height: 90vh; display: block; border-radius: 12px; box-shadow: 0 6px 40px #000a; }
-  /* Search grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-  .part-card{background:#0e1220;border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
-  .part-card img{width:100%;height:160px;object-fit:cover;border-radius:10px;border:1px solid var(--border);background:#0b0f1b}
-  .part-card .title{font-weight:600}
-  .part-card .meta{color:var(--muted);font-size:.9rem}
+/* Layout */
+.app{display:grid;grid-template-columns:var(--nav-w) 1fr;min-height:100dvh}
 
+/* Sidebar */
+.sidebar{
+  position:sticky;top:0;height:100dvh;
+  display:flex;flex-direction:column;
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow:hidden;transition:background var(--trans-slow),border-color var(--trans-slow);z-index:50;
+}
+.sidebar-inner{display:flex;flex-direction:column;height:100%;padding:20px 14px 16px;gap:4px}
+
+.logo{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.logo-icon{
+  width:36px;height:36px;background:var(--accent);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  box-shadow:0 0 20px var(--accent-glow);flex-shrink:0;
+}
+.logo-text{font-family:var(--font-head);font-weight:800;font-size:15px;color:var(--text);line-height:1.1}
+.logo-text span{display:block;font-size:10px;font-weight:400;color:var(--text-2);letter-spacing:.07em;text-transform:uppercase}
+
+.nav-label{font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);padding:4px 10px;margin-top:8px}
+.nav-item{
+  all:unset;display:flex;align-items:center;gap:11px;padding:10px 12px;
+  border-radius:10px;cursor:pointer;color:var(--text-2);
+  transition:all var(--trans);font-size:13px;user-select:none;
+}
+.nav-item:hover{background:var(--surface-3);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);font-weight:500}
+.nav-item .ni-icon{
+  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  border-radius:7px;font-size:14px;background:var(--surface-3);
+  transition:background var(--trans);flex-shrink:0;
+}
+.nav-item.active .ni-icon{background:var(--accent-glow)}
+.nav-item .ni-label{font-family:var(--font-head);font-weight:500}
+
+.sidebar-footer{
+  margin-top:auto;padding-top:14px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.server-badge{font-size:10.5px;color:var(--text-3);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.server-badge code{color:var(--text-2)}
+
+.theme-btn{
+  all:unset;width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface-3);border:1px solid var(--border);
+  cursor:pointer;font-size:14px;transition:all var(--trans);flex-shrink:0;
+}
+.theme-btn:hover{background:var(--border-hi);transform:rotate(18deg)}
+
+/* Mobile topbar */
+.topbar{
+  display:none;align-items:center;gap:12px;padding:11px 15px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:40;
+}
+.hamb{
+  all:unset;width:36px;height:36px;border-radius:8px;
+  background:var(--surface-3);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;flex-shrink:0;
+}
+.topbar-logo{font-family:var(--font-head);font-weight:800;font-size:15px;color:var(--text);flex:1}
+.backdrop{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:45;
+  backdrop-filter:blur(3px);opacity:0;transition:opacity var(--trans-slow);
+}
+.backdrop.show{opacity:1}
+
+@media(max-width:860px){
+  .app{grid-template-columns:1fr}
+  .sidebar{
+    position:fixed;inset:0 auto 0 0;width:min(var(--nav-w),82vw);
+    transform:translateX(-100%);transition:transform var(--trans-slow);
+    box-shadow:var(--shadow);
+  }
+  .sidebar.open{transform:translateX(0)}
+  .topbar{display:flex}
+  .backdrop{display:block}
+}
+
+/* Main */
+.main{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+
+.page{
+  display:none;flex-direction:column;gap:18px;
+  padding:24px 20px;max-width:960px;width:100%;margin:0 auto;
+  animation:fadeUp .28s ease both;
+}
+.page.active{display:flex}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Page header */
+.page-header{display:flex;align-items:flex-start;gap:14px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.page-icon{
+  width:44px;height:44px;border-radius:12px;background:var(--accent-dim);
+  display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;
+}
+.page-header-text h1{font-family:var(--font-head);font-size:21px;font-weight:700;color:var(--text);line-height:1.1}
+.page-header-text p{color:var(--text-2);margin-top:3px;font-size:12.5px}
+
+/* Cards */
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;
+  transition:background var(--trans-slow),border-color var(--trans-slow);
+}
+.card-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.card-header h2{font-family:var(--font-head);font-size:13.5px;font-weight:600;color:var(--text);flex:1}
+.badge{
+  font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 8px;border-radius:999px;background:var(--surface-3);border:1px solid var(--border);color:var(--text-2);
+}
+.badge.accent{background:var(--accent-dim);color:var(--accent);border-color:transparent}
+
+/* Fields */
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.field input,.field textarea,.field select{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);padding:9px 12px;outline:none;width:100%;
+  transition:border-color var(--trans),background var(--trans),box-shadow var(--trans);
+}
+.field input:focus,.field textarea:focus,.field select:focus{
+  border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);background:var(--surface);
+}
+.field input[readonly]{opacity:.6;cursor:default}
+.field textarea{min-height:80px;resize:vertical}
+.field select{
+  cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b9ab5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
+}
+.field-hint{font-size:11px;color:var(--text-3);margin-top:2px}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:580px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+/* Buttons */
+.btn{
+  all:unset;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--surface-3);color:var(--text-2);cursor:pointer;
+  font-size:12.5px;font-family:var(--font-head);font-weight:500;
+  transition:all var(--trans);white-space:nowrap;user-select:none;
+}
+.btn:hover{background:var(--border-hi);color:var(--text);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.primary{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 0 18px var(--accent-glow)}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn.ok{background:var(--ok-dim);color:var(--ok);border-color:transparent}
+.btn.ok:hover{filter:brightness(1.15)}
+.btn.danger{background:var(--err-dim);color:var(--err);border-color:transparent}
+.btn.danger:hover{filter:brightness(1.15)}
+.btn.sm{padding:5px 10px;font-size:11.5px;border-radius:6px}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* Status */
+.status-line{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;min-height:20px;transition:all var(--trans)}
+.status-line.ok{color:var(--ok)}.status-line.err{color:var(--err)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.75)}}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.dot.spin{animation:pulse 1s infinite}
+
+/* Part thumbnail */
+.part-thumb{
+  width:100px;height:100px;border-radius:var(--radius-sm);
+  background:var(--surface-2);border:1px solid var(--border);
+  object-fit:cover;cursor:zoom-in;transition:all var(--trans);display:block;
+}
+.part-thumb:hover{border-color:var(--accent);transform:scale(1.04)}
+
+/* Dropdown */
+.dropdown{position:relative}
+.dropdown-list{
+  position:absolute;z-index:100;left:0;right:0;top:calc(100% + 6px);
+  max-height:260px;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:6px;display:none;animation:fadeUp .14s ease both;
+}
+.dropdown.open .dropdown-list{display:block}
+.dropdown-item{padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-2);transition:all var(--trans);font-size:12.5px}
+.dropdown-item:hover{background:var(--surface-3);color:var(--text)}
+
+/* Stock */
+.stock-list{display:flex;flex-direction:column;gap:10px}
+.stock-item{
+  display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;
+  transition:border-color var(--trans);animation:fadeUp .2s ease both;
+}
+.stock-item:hover{border-color:var(--border-hi)}
+.stock-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.stock-info .stock-id{font-family:var(--font-head);font-size:12px;font-weight:600;color:var(--text)}
+.stock-info .s-loc{font-size:11.5px;color:var(--text-2);margin-top:2px}
+.stock-qty{font-family:var(--font-head);font-size:22px;font-weight:700;color:var(--accent);text-align:right;line-height:1}
+.stock-qty small{display:block;font-size:10px;font-weight:400;color:var(--text-3);font-family:var(--font-body)}
+.stock-actions{
+  grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  padding-top:10px;border-top:1px solid var(--border);margin-top:2px;
+}
+.qty-input{
+  width:90px;background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);padding:7px 10px;outline:none;font-size:12.5px;
+  transition:border-color var(--trans);
+}
+.qty-input:focus{border-color:var(--accent)}
+
+/* Search grid */
+.parts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.part-card{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px;display:flex;flex-direction:column;gap:8px;
+  cursor:pointer;transition:all var(--trans);animation:fadeUp .2s ease both;
+}
+.part-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 8px 30px var(--accent-glow)}
+.part-card img{width:100%;height:140px;object-fit:cover;border-radius:var(--radius-sm);background:var(--surface-3);display:block}
+.part-card .pc-name{font-family:var(--font-head);font-size:12.5px;font-weight:600;color:var(--text);line-height:1.2}
+.part-card .pc-meta{font-size:11px;color:var(--text-3)}
+.part-card .pc-stock{font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--accent);margin-top:auto}
+
+/* Empty */
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px;color:var(--text-3);text-align:center}
+.empty .ei{font-size:34px;opacity:.45}
+.empty p{font-size:13px}
+
+/* Modal */
+.modal-overlay{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:200;
+  visibility:hidden;opacity:0;transition:all var(--trans-slow);
+  background:rgba(0,0,0,.65);backdrop-filter:blur(4px);
+}
+.modal-overlay.show{visibility:visible;opacity:1}
+.modal-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:22px 24px;max-width:420px;width:92%;box-shadow:var(--shadow);
+  transform:scale(.93) translateY(10px);transition:transform var(--trans-slow);
+}
+.modal-overlay.show .modal-box{transform:scale(1) translateY(0)}
+.modal-box h3{font-family:var(--font-head);font-size:17px;font-weight:700;margin-bottom:8px}
+.modal-box p{color:var(--text-2);font-size:13px;line-height:1.5}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+#imgModal .modal-box{background:transparent;border:0;padding:0;max-width:90vw}
+#imgModal img{max-width:88vw;max-height:88vh;border-radius:var(--radius);display:block;box-shadow:0 8px 60px rgba(0,0,0,.7)}
+
+/* Label controls */
+.label-controls{display:flex;flex-wrap:wrap;gap:10px}
+.label-controls .field{min-width:140px;flex:1}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-3)}
+
+@media(max-width:520px){
+  .page{padding:14px 12px}
+  .card{padding:14px}
+  .parts-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}
+  .stock-item{grid-template-columns:auto 1fr}
+  .stock-qty{grid-column:1/-1;text-align:left}
+}
 </style>
 </head>
 <body>
 <div id="backdrop" class="backdrop"></div>
 <div class="app">
-  <!-- Sidebar -->
-  <aside id="sidebar" class="sidebar">
-    <div class="logo">InvenTree Companion</div>
-    <div class="menu">
-      <small>PAGES</small>
-      <button id="nav-add" class="active" onclick="showPage('add')">➕ Add Component</button>
-      <button id="nav-kiosk" onclick="showPage('kiosk')">🗂️ Kiosk (Stock)</button>
-        <button id="nav-search" onclick="showPage('search')">🔎 Search</button>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="sidebar" role="navigation">
+    <div class="sidebar-inner">
+      <div class="logo">
+        <div class="logo-icon">📦</div>
+        <div class="logo-text">InvenTree<span>Companion App</span></div>
+      </div>
+
+      <div class="nav-label">Navigation</div>
+
+      <button id="nav-add" class="nav-item active" onclick="showPage('add')">
+        <span class="ni-icon">➕</span>
+        <span class="ni-label">Add Component</span>
+      </button>
+      <button id="nav-kiosk" class="nav-item" onclick="showPage('kiosk')">
+        <span class="ni-icon">🗂</span>
+        <span class="ni-label">Kiosk · Stock</span>
+      </button>
+      <button id="nav-search" class="nav-item" onclick="showPage('search')">
+        <span class="ni-icon">🔎</span>
+        <span class="ni-label">Search Parts</span>
+      </button>
+
+      <div class="sidebar-footer">
+        <div class="server-badge">Server: <code>:8000</code></div>
+        <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+      </div>
     </div>
   </aside>
 
-  <!-- Main -->
-  <main>
-    <header>
-      <button class="hamb" onclick="toggleSidebar()">☰</button>
-      <div class="muted">Open on phone via <code>http://SERVER:8000/</code></div>
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- Mobile topbar -->
+    <header class="topbar">
+      <button class="hamb" onclick="toggleSidebar()" aria-label="Open menu">☰</button>
+      <div class="topbar-logo">📦 InvenTree</div>
+      <button class="theme-btn" id="themeBtnMobile">🌙</button>
     </header>
 
     <!-- ADD PAGE -->
-    <section id="page-add" class="page">
-      <div class="container">
-        <!-- Part Search -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Select Existing Part (optional)</h3>
-          <div class="row">
-            <div class="col dropdown" id="partSearchWrap">
-              <label>Search part (name or IPN)</label>
-              <input id="partSearch" placeholder="Type to search…" autocomplete="off" />
+    <section id="page-add" class="page active">
+      <div class="page-header">
+        <div class="page-icon">➕</div>
+        <div class="page-header-text">
+          <h1>Add Component</h1>
+          <p>Search, create, and photograph inventory parts</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Select Existing Part</h2>
+          <span class="badge">Optional</span>
+        </div>
+        <div class="grid-2" style="gap:14px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="field dropdown" id="partSearchWrap">
+              <label>Search by name or IPN</label>
+              <input id="partSearch" placeholder="Start typing…" autocomplete="off">
               <div id="partSearchList" class="dropdown-list"></div>
-              <small class="muted" id="partSearchStatus"></small>
             </div>
-            <div class="col">
+            <div class="field">
               <label>Selected Part</label>
-              <input id="selectedPartLabel" readonly placeholder="None" />
-              <input type="hidden" id="selectedPartId" />
-            </div>
-            <div class="col" style="max-width:140px">
-              <label>Image</label>
-              <img id="selectedPartThumb" class="thumb" alt="No image" />
+              <input id="selectedPartLabel" readonly placeholder="None selected">
+              <input type="hidden" id="selectedPartId">
             </div>
           </div>
-        </div>
-
-        <!-- AI Suggest -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">AI Suggest (optional)</h3>
-          <div class="row">
-            <div class="col" style="min-width:260px">
-              <label>Prompt</label>
-              <textarea id="aiPrompt" placeholder="e.g. M3x22 A2 DIN 912; BC548; RJ45 CAT6 shielded pass-through"></textarea>
-            </div>
-            <div class="col" style="min-width:220px">
-              <label>&nbsp;</label>
-              <div class="row" style="gap:8px;align-items:center;">
-                <button id="aiSuggest" class="btn">AI Suggest</button>
-                <label class="muted" style="display:flex;align-items:center;gap:6px;">
-                  <input type="checkbox" id="aiNameOnly" /> Name only
-                </label>
-                <label class="muted" style="display:flex;align-items:center;gap:6px;">
-                  <input type="checkbox" id="aiStrict" checked /> Strict
-                </label>
-              </div>
-              <div class="status" id="aiStatus"></div>
-            </div>
+          <div style="display:flex;align-items:center;justify-content:center">
+            <img id="selectedPartThumb" class="part-thumb" alt="Part image" style="width:130px;height:130px">
           </div>
         </div>
+      </div>
 
-        <!-- Create Part -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Create / Update Part</h3>
-          <div class="row">
-            <div class="col">
+      <div class="card">
+        <div class="card-header">
+          <h2>AI Suggest</h2>
+          <span class="badge accent">✨ Claude</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="field">
+            <label>Describe the part</label>
+            <textarea id="aiPrompt" placeholder="e.g. M3×22 A2 DIN 912, BC548, RJ45 CAT6 shielded pass-through…"></textarea>
+          </div>
+          <div class="btn-row">
+            <button id="aiSuggest" class="btn primary">✨ AI Suggest</button>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-2);font-size:12.5px">
+              <input type="checkbox" id="aiNameOnly" style="accent-color:var(--accent)"> Name only
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-2);font-size:12.5px">
+              <input type="checkbox" id="aiStrict" checked style="accent-color:var(--accent)"> Strict
+            </label>
+          </div>
+          <div class="status-line" id="aiStatus"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Create / Update Part</h2></div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="grid-2">
+            <div class="field">
               <label>Name</label>
-              <input id="newName" placeholder="M3 × 22 – Socket Head Cap Screw A2" />
+              <input id="newName" placeholder="M3 × 22 Socket Head Cap Screw A2">
             </div>
-            <div class="col">
+            <div class="field">
               <label>IPN (optional)</label>
-              <input id="newIPN" placeholder="Internal Part Number" />
+              <input id="newIPN" placeholder="Internal Part Number">
             </div>
           </div>
-          <div class="row">
-            <div class="col">
-              <label>Description</label>
-              <textarea id="newDesc" placeholder="M3 × 22 – Socket Head Cap Screw – DIN 912 – A2 Stainless Steel"></textarea>
-            </div>
+          <div class="field">
+            <label>Description</label>
+            <textarea id="newDesc" placeholder="M3 × 22 – Socket Head Cap Screw – DIN 912 – A2 Stainless Steel"></textarea>
           </div>
-          <div class="row">
-            <div class="col" style="min-width:150px">
-              <label>Initial Qty (optional)</label>
-              <input id="newQty" type="number" step="0.01" placeholder="100" />
+          <div class="grid-2">
+            <div class="field">
+              <label>Initial Quantity</label>
+              <input id="newQty" type="number" step="0.01" placeholder="100">
             </div>
-            <div class="col dropdown" id="locSearchWrap">
+            <div class="field dropdown" id="locSearchWrap">
               <label>Location (for initial qty)</label>
-              <input id="locSearch" placeholder="Type to search location…" autocomplete="off" />
+              <input id="locSearch" placeholder="Type to search…" autocomplete="off">
               <div id="locSearchList" class="dropdown-list"></div>
-              <input type="hidden" id="locId" />
+              <input type="hidden" id="locId">
             </div>
           </div>
-          <div class="row" style="gap:8px;align-items:center;">
+          <div class="btn-row">
             <button class="btn primary" id="btnCreate">Create Part</button>
-            <span id="createStatus" class="status"></span>
+            <div class="status-line" id="createStatus"></div>
           </div>
         </div>
+      </div>
 
-        <!-- Upload Image -->
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Upload Image (thumbnail)</h3>
-          <div class="row">
-            <div class="col" style="min-width:240px">
+      <div class="card">
+        <div class="card-header">
+          <h2>Upload Image</h2>
+          <span class="badge">Thumbnail</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="grid-2">
+            <div class="field">
               <label>Target Part ID</label>
-              <input id="uploadPartId" placeholder="Auto-fills when you select/create a part" />
+              <input id="uploadPartId" placeholder="Auto-fills from selection">
             </div>
-            <div class="col" style="min-width:240px">
+            <div class="field">
               <label>Image file (camera)</label>
-              <input id="uploadFile" type="file" accept="image/*" capture="environment" />
-              <small class="muted">On iOS, choose “Take Photo” after tapping.</small>
+              <input id="uploadFile" type="file" accept="image/*" capture="environment">
+              <div class="field-hint">On iOS: tap then choose "Take Photo"</div>
             </div>
           </div>
-          <div class="row" style="gap:8px;align-items:center;">
-            <button class="btn" id="btnUpload">Upload</button>
-            <span id="uploadStatus" class="status"></span>
+          <div class="btn-row">
+            <button class="btn" id="btnUpload">📤 Upload</button>
+            <div class="status-line" id="uploadStatus"></div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- KIOSK PAGE -->
-    <section id="page-kiosk" class="page" hidden>
-      <div class="container">
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Find Part</h3>
-          <div class="row">
-            <div class="col dropdown" id="kioskSearchWrap">
-              <label>Part (name/IPN or ID)</label>
-              <input id="kioskQuery" placeholder="Start typing… or paste Part ID" autocomplete="off" />
+    <section id="page-kiosk" class="page">
+      <div class="page-header">
+        <div class="page-icon">🗂</div>
+        <div class="page-header-text">
+          <h1>Kiosk · Stock</h1>
+          <p>Adjust quantities and manage stock locations</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Find Part</h2></div>
+        <div class="grid-2" style="gap:14px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="field dropdown" id="kioskSearchWrap">
+              <label>Name, IPN, or Part ID</label>
+              <input id="kioskQuery" placeholder="Type or paste a Part ID…" autocomplete="off">
               <div id="kioskSearchList" class="dropdown-list"></div>
-              <small class="muted" id="kioskStatus"></small>
+              <div class="field-hint" id="kioskStatus"></div>
             </div>
-            <div class="col">
+            <div class="field">
               <label>Selected Part</label>
-              <input id="kioskPartLabel" readonly />
-              <input type="hidden" id="kioskPartId" />
-            </div>
-            <div class="col" style="max-width:140px">
-              <label>Image</label>
-              <img id="kioskThumb" class="thumb" alt="No image" />
+              <input id="kioskPartLabel" readonly placeholder="Nothing selected">
+              <input type="hidden" id="kioskPartId">
             </div>
           </div>
-        </div>
-
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Stock Items</h3>
-          <div id="stockList" class="list"></div>
-          <div id="stockEmpty" class="muted">No stock items yet.</div>
-        </div>
-        <!-- Print Labels (NEW) -->
-        <div class="card" id="print-card" style="display:none">
-          <h3 style="margin-top:0">Print Labels</h3>
-          <div class="row">
-            <div>
-              <label>Model Type</label>
-              <select id="label-model">
-                <option value="stockitem">stockitem</option>
-                <option value="part">part</option>
-                <option value="stocklocation">stocklocation</option>
-              </select>
-            </div>
-            <div>
-              <label>Label Template</label>
-              <select id="label-template"></select>
-            </div>
-            <div>
-              <label>Printer Plugin (optional)</label>
-              <select id="label-plugin">
-                <option value="">(default)</option>
-              </select>
-            </div>
+          <div style="display:flex;align-items:center;justify-content:center">
+            <img id="kioskThumb" class="part-thumb" alt="Part image" style="width:130px;height:130px">
           </div>
-          <div class="actions">
-            <button class="btn" id="btn-load-templates">↻ Refresh Templates</button>
-            <button class="btn" id="btn-print">🖨️ Print</button>
-          </div>
-          <div class="tiny note">Select stock rows (to print stockitem labels), or switch to “part” to print the current part.</div>
-          <div id="print-status" class="tiny"></div>
         </div>
       </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Stock Items</h2>
+          <span class="badge" id="stockCountBadge">0 items</span>
+        </div>
+        <div id="stockList" class="stock-list"></div>
+        <div id="stockEmpty" class="empty">
+          <div class="ei">📭</div>
+          <p>No stock items. Select a part above.</p>
+        </div>
+      </div>
+
+      <div class="card" id="print-card" style="display:none">
+        <div class="card-header">
+          <h2>Print Labels</h2>
+          <span class="badge">🖨</span>
+        </div>
+        <div class="label-controls">
+          <div class="field">
+            <label>Model Type</label>
+            <select id="label-model">
+              <option value="stockitem">Stock Item</option>
+              <option value="part">Part</option>
+              <option value="stocklocation">Stock Location</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Label Template</label>
+            <select id="label-template"></select>
+          </div>
+          <div class="field">
+            <label>Printer Plugin</label>
+            <select id="label-plugin"><option value="">(default)</option></select>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn sm" id="btn-load-templates">↻ Refresh</button>
+          <button class="btn primary" id="btn-print">🖨 Print</button>
+          <div class="status-line" id="print-status"></div>
+        </div>
+        <p style="font-size:11px;color:var(--text-3);margin-top:8px">Select stock rows to print stockitem labels, or switch to Part mode.</p>
+      </div>
     </section>
+
     <!-- SEARCH PAGE -->
-    <section id="page-search" class="page" hidden>
-      <div class="container">
-        <div class="card">
-          <h3 style="margin:0 0 10px 0;">Search Parts</h3>
-          <div class="row">
-            <div class="col">
-              <label>Search</label>
-              <input id="searchInput" placeholder="Type words (space-separated) and press Enter" autocomplete="off" />
-              <small class="muted">Matches parts that contain <em>all</em> words in any order. Leave blank to browse all.</small>
-            </div>
-            <div class="col" style="max-width:160px">
-              <label>&nbsp;</label>
-              <button class="btn" id="btnSearchGo">Search</button>
-            </div>
-          </div>
+    <section id="page-search" class="page">
+      <div class="page-header">
+        <div class="page-icon">🔎</div>
+        <div class="page-header-text">
+          <h1>Search Parts</h1>
+          <p>Browse all inventory — all words must match</p>
         </div>
+      </div>
 
-        <div class="card">
-          <div id="searchStatus" class="muted"></div>
-          <div id="searchGrid" class="grid"></div>
-          <div style="margin-top:10px;display:flex;justify-content:center">
-            <button class="btn" id="btnSearchMore" style="display:none">Load more</button>
+      <div class="card">
+        <div style="display:flex;gap:10px;align-items:flex-end">
+          <div class="field" style="flex:1">
+            <label>Search query</label>
+            <input id="searchInput" placeholder="e.g. M3 stainless cap screw" autocomplete="off">
           </div>
+          <button class="btn primary" id="btnSearchGo">Search</button>
+        </div>
+        <p style="margin-top:8px;font-size:11.5px;color:var(--text-3)">Matches parts containing <em>all</em> words in any order. Leave blank to browse all.</p>
+      </div>
+
+      <div class="card">
+        <div class="status-line" id="searchStatus" style="margin-bottom:12px"></div>
+        <div id="searchGrid" class="parts-grid"></div>
+        <div style="display:flex;justify-content:center;margin-top:14px">
+          <button class="btn" id="btnSearchMore" style="display:none">Load more</button>
         </div>
       </div>
     </section>
 
-  </main>
+  </div>
 </div>
-<!-- Print confirmation modal (Add page) -->
-<div id="printConfirmModal" class="modal" aria-hidden="true">
-  <div class="box">
-    <h3>Print label?</h3>
-    <p class="muted">Print a part label for this newly created item using your default printer?</p>
-    <div class="actions">
-      <button class="btn" id="modalNo">No</button>
+
+<!-- MODALS -->
+<div id="printConfirmModal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h3>🖨 Print label?</h3>
+    <p>Send a part label for the newly created item to your default printer?</p>
+    <div class="modal-actions">
+      <button class="btn" id="modalNo">Skip</button>
       <button class="btn ok" id="modalYes">Print</button>
     </div>
   </div>
 </div>
-<!-- Image viewer modal -->
-<div id="imgModal" class="modal" aria-hidden="true" onclick="closeImageModal(event)">
-  <div class="box">
+
+<div id="imgModal" class="modal-overlay" role="dialog" aria-modal="true" onclick="closeImageModal(event)">
+  <div class="modal-box">
     <img id="imgModalPic" alt="Part image">
   </div>
 </div>
+
 <script>
-  // ---------- Layout ----------
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('backdrop');
-  function toggleSidebar(){ sidebar.classList.toggle('open'); }
-  backdrop.onclick = () => sidebar.classList.remove('open');
+// THEME
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  const icon=t==='dark'?'🌙':'☀️';
+  document.getElementById('themeBtn').textContent=icon;
+  document.getElementById('themeBtnMobile').textContent=icon;
+  localStorage.setItem('theme',t);
+}
+applyTheme(localStorage.getItem('theme')||'dark');
+function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark')}
+document.getElementById('themeBtn').onclick=toggleTheme;
+document.getElementById('themeBtnMobile').onclick=toggleTheme;
 
-  function showPage(id){
-    document.getElementById('page-add').hidden = id !== 'add';
-    document.getElementById('page-kiosk').hidden = id !== 'kiosk';
-    document.getElementById('page-search').hidden = id !== 'search';
+// SIDEBAR
+const sidebar=document.getElementById('sidebar');
+const backdrop=document.getElementById('backdrop');
+function toggleSidebar(){const o=sidebar.classList.toggle('open');backdrop.classList.toggle('show',o)}
+backdrop.onclick=()=>{sidebar.classList.remove('open');backdrop.classList.remove('show')}
 
-    document.getElementById('nav-add').classList.toggle('active', id==='add');
-    document.getElementById('nav-kiosk').classList.toggle('active', id==='kiosk');
-    document.getElementById('nav-search').classList.toggle('active', id==='search');
-
-    sidebar.classList.remove('open');
-
-    if(id === 'search'){ ensureSearchInitialized(); }
-  }
-
-
-  // ---------- HTTP helpers ----------
-  async function apiGET(url){
-    const r = await fetch(url);
-    let body = null;
-    try { body = await r.json(); } catch {}
-    if(!r.ok) throw new Error((body && body.detail) || `GET ${url} failed`);
-    return body;
-  }
-  async function apiPOST(url, payload){
-    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-    const body = await r.json().catch(()=> ({}));
-    if(!r.ok) throw new Error(body.detail || `POST ${url} failed`);
-    return body;
-  }
-
-  // ---------- Typeahead ----------
-  function attachTypeahead({inputEl, listEl, onQuery, onPick}){
-    let timer=null;
-    const wrap = inputEl.closest('.dropdown');
-    inputEl.addEventListener('input', ()=>{
-      const q = inputEl.value.trim();
-      if(timer) clearTimeout(timer);
-      if(!q){ listEl.innerHTML=''; wrap.classList.remove('open'); return; }
-      timer = setTimeout(async ()=>{
-        try{
-          const items = await onQuery(q);
-          if(!items.length){ listEl.innerHTML = `<div class="dropdown-item muted">No results</div>`; wrap.classList.add('open'); return; }
-          listEl.innerHTML = items.map(it => `<div class="dropdown-item" data-pk="${it.pk}">${it.label}</div>`).join('');
-          wrap.classList.add('open');
-        }catch(e){
-          listEl.innerHTML = `<div class="dropdown-item muted">Error: ${e.message}</div>`;
-          wrap.classList.add('open');
-        }
-      }, 150);
-    });
-    listEl.addEventListener('click', (e)=>{
-      const item = e.target.closest('.dropdown-item');
-      if(!item) return;
-      const pk = item.getAttribute('data-pk');
-      const label = item.textContent;
-      inputEl.value = label;
-      wrap.classList.remove('open');
-      onPick({pk, label});
-    });
-    document.addEventListener('click', (e)=>{
-      if(!wrap.contains(e.target)){ wrap.classList.remove('open'); }
-    });
-  }
-
-  // ---------- Part Search (Add page) ----------
-  const partSearch = document.getElementById('partSearch');
-  const partSearchList = document.getElementById('partSearchList');
-  const partSearchStatus = document.getElementById('partSearchStatus');
-  const selectedPartLabel = document.getElementById('selectedPartLabel');
-  const selectedPartId = document.getElementById('selectedPartId');
-  const selectedPartThumb = document.getElementById('selectedPartThumb');
-  selectedPartThumb.classList.add('clickable');
-  selectedPartThumb.addEventListener('click', () => openImageModal(selectedPartThumb.src));
-  const uploadPartId = document.getElementById('uploadPartId');
-
-  attachTypeahead({
-    inputEl: partSearch,
-    listEl: partSearchList,
-    onQuery: async (q)=>{
-      const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=10`);
-      return rows.map(r=>({pk:r.pk, label:`${r.name}${r.ipn?` (IPN: ${r.ipn})`:''}`}));
-    },
-    onPick: ({pk, label})=>{
-      selectedPartLabel.value = label;
-      selectedPartId.value = pk;
-      uploadPartId.value = pk;
-      partSearchStatus.textContent = `Selected Part ID: ${pk}`;
-      selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
-      selectedPartThumb.src = `/api/part/image-proxy?pk=${pk}&_=${Date.now()}`;
-    }
+// PAGES
+function showPage(id){
+  ['add','kiosk','search'].forEach(p=>{
+    document.getElementById('page-'+p).classList.toggle('active',p===id);
+    document.getElementById('nav-'+p).classList.toggle('active',p===id);
   });
-
-  // ---------- Location search (Add page) ----------
-  const locSearch = document.getElementById('locSearch');
-  const locList = document.getElementById('locSearchList');
-  const locId = document.getElementById('locId');
-
-  attachTypeahead({
-    inputEl: locSearch,
-    listEl: locList,
-    onQuery: async (q)=>{
-      const rows = await apiGET(`/api/locations?q=${encodeURIComponent(q)}&limit=12`);
-      return rows.map(r=>({pk:r.pk, label:r.path || r.name}));
-    },
-    onPick: ({pk, label})=>{
-      locId.value = pk;
-      locSearch.value = label;
-    }
-  });
-
-  // ---------- AI Suggest ----------
-  const aiBtn = document.getElementById('aiSuggest');
-  const aiPromptEl = document.getElementById('aiPrompt');
-  const aiStatus = document.getElementById('aiStatus');
-  const aiNameOnlyEl = document.getElementById('aiNameOnly');
-  const aiStrictEl = document.getElementById('aiStrict');
-
-  aiBtn.onclick = async ()=>{
-    const prompt = aiPromptEl.value.trim();
-    if(!prompt){ aiStatus.textContent = 'Type something first.'; return; }
-    aiStatus.textContent = 'Thinking…';
-    try{
-      const r = await fetch('/api/ai/suggest-part', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          prompt,
-          language: (navigator.language||'en').slice(0,2),
-          name_only: !!aiNameOnlyEl.checked,
-          strict: !!aiStrictEl.checked
-        })
-      });
-      const j = await r.json();
-      if(!r.ok) throw new Error(j.detail || 'AI failed');
-
-      document.getElementById('newName').value = j.name || '';
-      if(!aiNameOnlyEl.checked){
-        document.getElementById('newDesc').value = j.description || '';
-      }
-      aiStatus.textContent = '✅ Suggested. Review, then Create.';
-    }catch(e){
-      aiStatus.textContent = '❌ ' + e.message;
-    }
-  };
-
-  // ---------- Create Part ----------
-  const btnCreate = document.getElementById('btnCreate');
-  const createStatus = document.getElementById('createStatus');
-
-  // --- image lightbox modal
-  const imgModal = document.getElementById('imgModal');
-  const imgModalPic = document.getElementById('imgModalPic');
-
-  function openImageModal(url){
-    if(!url) return;
-    // strip cache-buster if present
-    const clean = url.replace(/([?&])_=\d+(&|$)/, '$1').replace(/[?&]$/, '');
-    if (imgModalPic) imgModalPic.src = clean;
-    if (imgModal) imgModal.classList.add('show');
-  }
-  function closeImageModal(e){
-    // close when clicking backdrop or pressing ESC
-    if (e && e.target && e.target !== imgModal) return;
-    if (imgModal) imgModal.classList.remove('show');
-    if (imgModalPic) imgModalPic.removeAttribute('src');
-  }
-  document.addEventListener('keydown', (ev)=>{ if(ev.key === 'Escape') closeImageModal(); });
-
-
-  // --- print-confirm modal wiring (Add page)
-  const DEFAULT_PART_LABEL_TEMPLATE_ID = 11; // change if your part label template ID differs
-  const printModal = document.getElementById('printConfirmModal');
-  const modalNoBtn = document.getElementById('modalNo');
-  const modalYesBtn = document.getElementById('modalYes');
-  let _lastCreatedPartId = null;
-
-  function openPrintModal(partId){
-    _lastCreatedPartId = partId;
-    if (printModal) printModal.classList.add('show');
-  }
-  function closePrintModal(){
-    if (printModal) printModal.classList.remove('show');
-  }
-
-  if (modalNoBtn) modalNoBtn.addEventListener('click', closePrintModal);
-
-  if (modalYesBtn) modalYesBtn.addEventListener('click', async () => {
-    const pid = _lastCreatedPartId;
-    closePrintModal();
-    if(!pid) return;
-    createStatus.textContent = 'Sending print job…';
-    try{
-      const res = await fetch('/api/labels/print', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template_id: DEFAULT_PART_LABEL_TEMPLATE_ID, items: [Number(pid)] })
-      });
-      const j = await res.json().catch(()=>({}));
-      if(!res.ok) throw new Error(j.detail || 'Print failed');
-      createStatus.textContent = '🖨️ Print job sent';
-    }catch(e){
-      createStatus.textContent = '❌ Print failed: ' + e.message;
-    }
-  });
-
-
-  btnCreate.onclick = async ()=>{
-    const name = document.getElementById('newName').value.trim();
-    const description = document.getElementById('newDesc').value.trim();
-    const ipn = document.getElementById('newIPN').value.trim();
-    const qty = document.getElementById('newQty').value.trim();
-    const location_id = document.getElementById('locId').value.trim();
-
-    if(!name){ createStatus.textContent='❌ Name required'; return; }
-    createStatus.textContent = 'Saving…';
-
-    const fd = new FormData();
-    fd.append('name', name);
-    if(description) fd.append('description', description);
-    if(ipn) fd.append('ipn', ipn);
-    if(qty) fd.append('initial_qty', qty);
-    if(qty && location_id) fd.append('location_id', location_id);
-
-    try{
-      const r = await fetch('/api/part/create',{method:'POST', body:fd});
-      const j = await r.json();
-      if(!r.ok) throw new Error(j.detail || 'Create failed');
-
-      createStatus.textContent = '✅ ' + (j.message || 'Created');
-      selectedPartLabel.value = `${j.name} (ID ${j.pk})`;
-      selectedPartId.value = j.pk;
-      uploadPartId.value = j.pk;
-      selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
-      selectedPartThumb.src = `/api/part/image-proxy?pk=${j.pk}&_=${Date.now()}`;
-      // Store current part id for printing elsewhere and ask to print now
-      window.currentPartId = j.pk;
-      openPrintModal(j.pk);
-    }catch(e){
-      createStatus.textContent = '❌ ' + e.message;
-    }
-  };
-
-  // ---------- Upload image ----------
-  const btnUpload = document.getElementById('btnUpload');
-  const uploadStatus = document.getElementById('uploadStatus');
-
-  btnUpload.onclick = async ()=>{
-    const pid = (document.getElementById('uploadPartId').value || '').trim();
-    const file = document.getElementById('uploadFile').files[0];
-    if(!pid){ uploadStatus.textContent='❌ Part ID required'; return; }
-    if(!file){ uploadStatus.textContent='❌ Pick an image'; return; }
-    uploadStatus.textContent = 'Uploading…';
-
-    const fd = new FormData();
-    fd.append('part_id', pid);
-    fd.append('image', file);
-
-    try{
-      const r = await fetch('/api/upload',{method:'POST', body:fd});
-      const j = await r.json();
-      if(!r.ok) throw new Error(j.detail || 'Upload failed');
-
-      uploadStatus.textContent = '✅ Uploaded';
-      selectedPartThumb.onerror = () => selectedPartThumb.removeAttribute('src');
-      selectedPartThumb.src = `/api/part/image-proxy?pk=${pid}&_=${Date.now()}`;
-
-      if(document.getElementById('kioskPartId').value == pid){
-        kioskThumb.onerror = () => kioskThumb.removeAttribute('src');
-        kioskThumb.src = `/api/part/image-proxy?pk=${pid}&_=${Date.now()}`;
-      }
-    }catch(e){
-      uploadStatus.textContent = '❌ ' + e.message;
-    }
-  };
-
-  // ---------- Kiosk search & stock ----------
-  const kioskQuery = document.getElementById('kioskQuery');
-  const kioskList = document.getElementById('kioskSearchList');
-  const kioskStatus = document.getElementById('kioskStatus');
-  const kioskPartId = document.getElementById('kioskPartId');
-  const kioskPartLabel = document.getElementById('kioskPartLabel');
-  const kioskThumb = document.getElementById('kioskThumb');
-  kioskThumb.classList.add('clickable');
-  kioskThumb.addEventListener('click', () => openImageModal(kioskThumb.src));
-  const stockList = document.getElementById('stockList');
-  const stockEmpty = document.getElementById('stockEmpty');
-
-  attachTypeahead({
-    inputEl: kioskQuery,
-    listEl: kioskList,
-    onQuery: async (q)=>{
-      const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=10`);
-      return rows.map(r=>({pk:r.pk, label:`${r.name}${r.ipn?` (IPN: ${r.ipn})`:''}`}));
-    },
-    onPick: ({pk, label})=> loadKioskPart(pk, label)
-  });
-
-  kioskQuery.addEventListener('keydown', async (e)=>{
-    if(e.key==='Enter'){
-      const q = kioskQuery.value.trim();
-      if(!q) return;
-      // numeric id?
-      if(/^\d+$/.test(q)){
-        try{
-          const p = await apiGET(`/api/part/by-id?pk=${q}`);
-          return loadKioskPart(p.pk, `${p.name}${p.ipn?` (IPN: ${p.ipn})`:''}`);
-        }catch{}
-      }
-      // first search hit
-      try{
-        const rows = await apiGET(`/api/parts?q=${encodeURIComponent(q)}&limit=1`);
-        if(rows.length){ loadKioskPart(rows[0].pk, `${rows[0].name}${rows[0].ipn?` (IPN: ${rows[0].ipn})`:''}`); }
-        else kioskStatus.textContent = 'No results';
-      }catch(e){ kioskStatus.textContent = '❌ ' + e.message; }
-    }
-  });
-
-async function loadKioskPart(pk, label){
-  kioskPartId.value = pk;
-  kioskPartLabel.value = label || `ID ${pk}`;
-  kioskStatus.textContent = `Part ID: ${pk}`;
-  kioskThumb.onerror = () => kioskThumb.removeAttribute('src');
-  kioskThumb.src = `/api/part/image-proxy?pk=${pk}&_=${Date.now()}`;
-  await refreshStock(pk);
-
-  // 👉 enable/prepare the Print Labels panel for this part
-  await window.kioskEnablePrintPanel(pk);
+  sidebar.classList.remove('open');backdrop.classList.remove('show');
+  if(id==='search')ensureSearchInitialized();
 }
 
+// HTTP
+async function apiGET(url){
+  const r=await fetch(url);let body=null;
+  try{body=await r.json()}catch{}
+  if(!r.ok)throw new Error((body&&body.detail)||'GET '+url+' failed');
+  return body;
+}
+async function apiPOST(url,payload){
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(body.detail||'POST '+url+' failed');
+  return body;
+}
 
-  async function refreshStock(partId){
-    try{
-      const items = await apiGET(`/api/stock/by-part?part_id=${partId}`);
-      stockList.innerHTML = '';
-      if(!items.length){ stockEmpty.style.display='block'; return; }
-      stockEmpty.style.display='none';
-      for(const it of items){
-        const id = it.pk;
-        const row = document.createElement('div');
-        row.className = 'stock-card';
-        row.innerHTML = `
-          <div class="grow">
-            <div><strong>Stock #${id}</strong> — <span class="pill">${(it.location_path||'No location')}</span></div>
-            <div class="muted">Qty: <strong>${it.quantity}</strong></div>
-            ${it.batch ? `<div class="muted">Batch: ${it.batch}</div>` : ``}
-            ${it.serial ? `<div class="muted">Serial: ${it.serial}</div>` : ``}
-          </div>
-          <div class="right" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <!-- ✅ checkbox to select this stock item for printing -->
-            <label class="pill" style="display:flex;align-items:center;gap:6px">
-              <input type="checkbox" class="chk" value="${id}"> Print
-            </label>
+// STATUS
+function setStatus(el,msg,type){
+  if(typeof el==='string')el=document.getElementById(el);
+  if(!el)return;
+  el.className='status-line'+(type?' '+type:'');
+  el.innerHTML=msg?'<span class="dot '+(type==='loading'?'spin':'')+'"></span>'+msg:'';
+}
 
-            <input class="pill" style="width:110px" placeholder="Remove…" inputmode="decimal" id="rm-${id}">
-            <button class="btn warn" id="btn-rm-${id}">Remove</button>
-            <input class="pill" style="width:110px" placeholder="Add…" inputmode="decimal" id="ad-${id}">
-            <button class="btn ok" id="btn-ad-${id}">Add</button>
-          </div>
-        `;
-        stockList.appendChild(row);
-        document.getElementById(`btn-rm-${id}`).onclick = async ()=>{
-          const v = parseFloat((document.getElementById(`rm-${id}`).value||'').replace(',', '.'));
-          if(!(v>0)) return;
-          await adjustQty('remove', id, v);
-        };
-        document.getElementById(`btn-ad-${id}`).onclick = async ()=>{
-          const v = parseFloat((document.getElementById(`ad-${id}`).value||'').replace(',', '.'));
-          if(!(v>0)) return;
-          await adjustQty('add', id, v);
-        };
-      }
-    }catch(e){
-      stockList.innerHTML = `<div class="muted">❌ ${e.message}</div>`;
-    }
-  }
-
-  async function adjustQty(kind, stockId, qty){
-    try{
-      const url = kind==='add' ? '/api/stock/add_qty' : '/api/stock/remove_qty';
-      await apiPOST(url, {stock_id: stockId, quantity: qty, notes: 'Kiosk adjust'});
-      await refreshStock(document.getElementById('kioskPartId').value);
-    }catch(e){
-      alert('Adjust failed: ' + e.message);
-    }
-  }
-
-  // keep Upload Part ID in sync if user manually edits selection
-  selectedPartId.addEventListener('change', ()=> uploadPartId.value = selectedPartId.value);
-  // ---------- Search page (parts as large image cards) ----------
-  const searchInput = document.getElementById('searchInput');
-  const btnSearchGo = document.getElementById('btnSearchGo');
-  const btnSearchMore = document.getElementById('btnSearchMore');
-  const searchGrid = document.getElementById('searchGrid');
-  const searchStatus = document.getElementById('searchStatus');
-
-  let _searchInit = false;
-  let searchState = { q: '', offset: 0, limit: 24, loading: false, done: false };
-
-  function ensureSearchInitialized(){
-    if(_searchInit) return;
-    _searchInit = true;
-    resetSearch('');
-  }
-
-  function esc(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-
-  function parseWords(q){
-    return (q||'')
-      .toLowerCase()
-      .split(/\s+/)
-      .map(w=>w.trim())
-      .filter(Boolean);
-  }
-
-  function matchesAllWords(part, words){
-    if(!words.length) return true;
-    const blob = `${part.name||''} ${part.ipn||''} ${part.description||''}`.toLowerCase();
-    return words.every(w => blob.includes(w));
-  }
-
-  async function fetchPartsPage(q, offset, limit){
-    const u = new URL(location.origin + `/api/parts`);
-    if(q) u.searchParams.set('q', q); // server 'search' for broad fetch
-    u.searchParams.set('limit', String(limit));
-    u.searchParams.set('offset', String(offset));
-    return await apiGET(u.pathname + u.search);
-  }
-
-  async function fillStockTotalForCard(cardEl, partId){
-    try{
-      const items = await apiGET(`/api/stock/by-part?part_id=${partId}`);
-      const total = (items||[]).reduce((acc, it)=> acc + (parseFloat(it.quantity)||0), 0);
-      const span = cardEl.querySelector('.stock');
-      if(span) span.textContent = String(total);
-    }catch(_){
-      const span = cardEl.querySelector('.stock');
-      if(span) span.textContent = '0';
-    }
-  }
-
-  async function renderSearch({reset=false} = {}){
-    if(searchState.loading || (searchState.done && !reset)) return;
-
-    const words = parseWords(searchState.q);
-
-    if(reset){
-      searchState.offset = 0;
-      searchState.done = false;
-      searchGrid.innerHTML = '';
-      searchStatus.textContent = words.length ? `Searching for: ${words.join(' AND ')}` : 'Browsing all parts';
-    }
-
-    searchState.loading = true;
-    btnSearchMore.style.display = 'none';
-
-    try{
-      const page = await fetchPartsPage(words[0] || '', searchState.offset, searchState.limit);
-      // Client-side AND-filter across words:
-      const filtered = page.filter(p => matchesAllWords(p, words));
-
-      if(filtered.length === 0 && page.length === 0){
-        if(searchState.offset === 0){
-          searchStatus.textContent = 'No parts found.';
-          searchGrid.innerHTML = '';
-        }
-        searchState.done = true;
-        return;
-      }
-
-      // Render cards
-      for(const p of filtered){
-        const card = document.createElement('div');
-        card.className = 'part-card';
-        card.setAttribute('data-pk', p.pk);
-        const label = `${p.name}${p.ipn ? ` (IPN: ${p.ipn})` : ''}`;
-        const imgUrl = `/api/part/image-proxy?pk=${p.pk}&_=${Date.now()}`;
-
-        card.innerHTML = `
-          <img src="${imgUrl}" alt="${esc(p.name||'Part image')}" onerror="this.style.display='none'">
-          <div class="title">${esc(p.name || 'Unnamed')}</div>
-          <div class="meta">${p.ipn ? `IPN: ${esc(p.ipn)} · ` : ''}Stock: <span class="stock">…</span></div>
-        `;
-
-        // Click -> jump to kiosk for that part
-        card.addEventListener('click', ()=>{
-          showPage('kiosk');
-          loadKioskPart(p.pk, label);
-        });
-
-        // If you implemented image preview earlier, use it on image click:
-        card.querySelector('img')?.addEventListener('click', (e)=>{
-          e.stopPropagation();
-          if(typeof window.openImagePreview === 'function'){
-            window.openImagePreview(imgUrl);
-          }
-        });
-
-        searchGrid.appendChild(card);
-
-        // fill stock total asynchronously
-        fillStockTotalForCard(card, p.pk);
-      }
-
-      // Paging
-      searchState.offset += page.length;
-      btnSearchMore.style.display = (page.length >= searchState.limit) ? '' : 'none';
-      if(page.length < searchState.limit){
-        searchState.done = true;
-      }
-    }catch(e){
-      searchStatus.textContent = '❌ ' + e.message;
-    }finally{
-      searchState.loading = false;
-    }
-  }
-
-  function resetSearch(q){
-    searchState.q = q || '';
-    renderSearch({reset:true});
-  }
-
-  btnSearchGo?.addEventListener('click', ()=> resetSearch(searchInput.value));
-  searchInput?.addEventListener('keydown', (e)=>{
-    if(e.key === 'Enter'){ resetSearch(searchInput.value); }
+// TYPEAHEAD
+function attachTypeahead({inputEl,listEl,onQuery,onPick}){
+  let timer=null;
+  const wrap=inputEl.closest('.dropdown');
+  inputEl.addEventListener('input',()=>{
+    const q=inputEl.value.trim();
+    if(timer)clearTimeout(timer);
+    if(!q){listEl.innerHTML='';wrap.classList.remove('open');return}
+    timer=setTimeout(async()=>{
+      try{
+        const items=await onQuery(q);
+        if(!items.length){listEl.innerHTML='<div class="dropdown-item" style="color:var(--text-3)">No results</div>';wrap.classList.add('open');return}
+        listEl.innerHTML=items.map(it=>'<div class="dropdown-item" data-pk="'+it.pk+'">'+it.label+'</div>').join('');
+        wrap.classList.add('open');
+      }catch(e){listEl.innerHTML='<div class="dropdown-item" style="color:var(--err)">Error: '+e.message+'</div>';wrap.classList.add('open')}
+    },150);
   });
-  btnSearchMore?.addEventListener('click', ()=> renderSearch({reset:false}));
-
-  // ---------- Print: helpers (ADD) ----------
-  async function refreshPrintPlugins(){
-    try{
-      const res = await fetch('/api/plugins/label?active=true');
-      const data = await res.json();
-      const sel = document.getElementById('label-plugin');
-      if(!sel) return;
-      sel.innerHTML = '<option value="">(default)</option>';
-      (data||[]).forEach(p=>{
-        const o = document.createElement('option');
-        o.value = p.pk;
-        o.textContent = `${p.name}`;
-        sel.appendChild(o);
-      });
-    }catch(e){ /* ignore */ }
-  }
-
-  async function refreshPrintTemplates(){
-    const model = document.getElementById('label-model').value;
-    try{
-      const res = await fetch(`/api/labels/templates?model_type=${encodeURIComponent(model)}&enabled=true`);
-      const data = await res.json();
-      const sel = document.getElementById('label-template');
-      sel.innerHTML = '';
-      (data||[]).forEach(t=>{
-        const o = document.createElement('option');
-        o.value = t.pk;
-        o.textContent = `${t.name} (${t.model_type})`;
-        sel.appendChild(o);
-      });
-    }catch(e){ /* ignore */ }
-  }
-
-  document.getElementById('label-model').addEventListener('change', refreshPrintTemplates);
-  document.getElementById('btn-load-templates').addEventListener('click', refreshPrintTemplates);
-
-  document.getElementById('btn-print').addEventListener('click', async ()=>{
-    const status = document.getElementById('print-status');
-    const model = document.getElementById('label-model').value;
-    const templateId = Number(document.getElementById('label-template').value);
-    const pluginVal = document.getElementById('label-plugin').value;
-    const pluginId = pluginVal ? Number(pluginVal) : null;
-
-    if(!templateId){ status.textContent = 'Pick a template'; return; }
-
-    // Collect items: for stockitem, gather selected rows; for part, use currentPartId
-    let items = [];
-    if(model === 'stockitem'){
-      // NOTE: if your checkboxes use a different selector than '#stock-table .chk', change it here:
-      const checks = Array.from(document.querySelectorAll('#stockList .chk:checked'));
-      if(checks.length === 0){ status.textContent = 'Select at least one stock item'; return; }
-      items = checks.map(c=>Number(c.value));
-    } else if (model === 'part'){
-      // If your code stores current part id differently, replace the next line accordingly:
-      const pid = window.currentPartId || null;
-      if(!pid){ status.textContent = 'No part selected'; return; }
-      items = [Number(pid)];
-    } else {
-      status.textContent = 'stocklocation printing not wired here';
-      return;
-    }
-
-    status.textContent = 'Sending print job...';
-    try{
-      const body = { template_id: templateId, items: items };
-      if(pluginId !== null) body.plugin_id = pluginId;
-      const res = await fetch('/api/labels/print', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-      });
-      if(!res.ok){ throw new Error(await res.text()); }
-      status.innerHTML = '<span class="ok">Print job sent</span>';
-    }catch(e){
-      status.innerHTML = `<span class="err">${e}</span>`;
-    }
+  listEl.addEventListener('click',e=>{
+    const item=e.target.closest('.dropdown-item');
+    if(!item||!item.getAttribute('data-pk'))return;
+    inputEl.value=item.textContent;wrap.classList.remove('open');
+    onPick({pk:item.getAttribute('data-pk'),label:item.textContent});
   });
+  document.addEventListener('click',e=>{if(!wrap.contains(e.target))wrap.classList.remove('open')});
+}
 
-  // Call this AFTER your kiosk search selects a part and renders stock rows:
-  window.kioskEnablePrintPanel = async function(partId){
-    // Store current part id for the 'part' model printing
-    window.currentPartId = partId;
-    // Show the card
-    const card = document.getElementById('print-card');
-    if(card) card.style.display = '';
-    // Default to stockitem printing when stock rows are present:
-    const modelSel = document.getElementById('label-model');
-    if(modelSel) modelSel.value = 'stockitem';
-    await refreshPrintPlugins();
-    await refreshPrintTemplates();
-  };
+// IMAGE MODAL
+const imgModal=document.getElementById('imgModal');
+const imgModalPic=document.getElementById('imgModalPic');
+function openImageModal(url){
+  if(!url)return;
+  const clean=url.replace(/([?&])_=\d+(&|$)/,'$1').replace(/[?&]$/,'');
+  imgModalPic.src=clean;imgModal.classList.add('show');
+}
+function closeImageModal(e){
+  if(e&&e.target!==imgModal)return;
+  imgModal.classList.remove('show');imgModalPic.removeAttribute('src');
+}
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){imgModal.classList.remove('show');closePrintModal()}});
+
+// ADD PAGE – Part Search
+const selectedPartLabel=document.getElementById('selectedPartLabel');
+const selectedPartId=document.getElementById('selectedPartId');
+const selectedPartThumb=document.getElementById('selectedPartThumb');
+const uploadPartId=document.getElementById('uploadPartId');
+selectedPartThumb.addEventListener('click',()=>openImageModal(selectedPartThumb.src));
+
+attachTypeahead({
+  inputEl:document.getElementById('partSearch'),
+  listEl:document.getElementById('partSearchList'),
+  onQuery:async q=>{
+    const rows=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=10');
+    return rows.map(r=>({pk:r.pk,label:r.name+(r.ipn?' (IPN: '+r.ipn+')':'')}));
+  },
+  onPick:({pk,label})=>{
+    selectedPartLabel.value=label;selectedPartId.value=pk;uploadPartId.value=pk;
+    selectedPartThumb.onerror=()=>selectedPartThumb.removeAttribute('src');
+    selectedPartThumb.src='/api/part/image-proxy?pk='+pk+'&_='+Date.now();
+  }
+});
+
+// Location Search
+attachTypeahead({
+  inputEl:document.getElementById('locSearch'),
+  listEl:document.getElementById('locSearchList'),
+  onQuery:async q=>{
+    const rows=await apiGET('/api/locations?q='+encodeURIComponent(q)+'&limit=12');
+    return rows.map(r=>({pk:r.pk,label:r.path||r.name}));
+  },
+  onPick:({pk,label})=>{document.getElementById('locId').value=pk;document.getElementById('locSearch').value=label}
+});
+
+// AI SUGGEST
+document.getElementById('aiSuggest').onclick=async()=>{
+  const prompt=document.getElementById('aiPrompt').value.trim();
+  if(!prompt){setStatus('aiStatus','Type a description first.');return}
+  setStatus('aiStatus','Thinking…','loading');
+  try{
+    const r=await fetch('/api/ai/suggest-part',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt,language:(navigator.language||'en').slice(0,2),
+        name_only:!!document.getElementById('aiNameOnly').checked,
+        strict:!!document.getElementById('aiStrict').checked})
+    });
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||'AI failed');
+    document.getElementById('newName').value=j.name||'';
+    if(!document.getElementById('aiNameOnly').checked)document.getElementById('newDesc').value=j.description||'';
+    setStatus('aiStatus','✅ Suggested — review and create','ok');
+  }catch(e){setStatus('aiStatus','❌ '+e.message,'err')}
+};
+
+// CREATE PART
+const DEFAULT_PART_LABEL_TEMPLATE_ID=11;
+const printModal=document.getElementById('printConfirmModal');
+let _lastCreatedPartId=null;
+function openPrintModal(pid){_lastCreatedPartId=pid;printModal.classList.add('show')}
+function closePrintModal(){printModal.classList.remove('show')}
+document.getElementById('modalNo').onclick=closePrintModal;
+document.getElementById('modalYes').onclick=async()=>{
+  const pid=_lastCreatedPartId;closePrintModal();if(!pid)return;
+  setStatus('createStatus','Sending print job…','loading');
+  try{
+    const res=await fetch('/api/labels/print',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({template_id:DEFAULT_PART_LABEL_TEMPLATE_ID,items:[Number(pid)]})});
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(j.detail||'Print failed');
+    setStatus('createStatus','🖨 Print job sent','ok');
+  }catch(e){setStatus('createStatus','❌ '+e.message,'err')}
+};
+
+document.getElementById('btnCreate').onclick=async()=>{
+  const name=document.getElementById('newName').value.trim();
+  const description=document.getElementById('newDesc').value.trim();
+  const ipn=document.getElementById('newIPN').value.trim();
+  const qty=document.getElementById('newQty').value.trim();
+  const location_id=document.getElementById('locId').value.trim();
+  if(!name){setStatus('createStatus','❌ Name is required','err');return}
+  setStatus('createStatus','Saving…','loading');
+  const fd=new FormData();
+  fd.append('name',name);
+  if(description)fd.append('description',description);
+  if(ipn)fd.append('ipn',ipn);
+  if(qty)fd.append('initial_qty',qty);
+  if(qty&&location_id)fd.append('location_id',location_id);
+  try{
+    const r=await fetch('/api/part/create',{method:'POST',body:fd});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||'Create failed');
+    setStatus('createStatus','✅ '+(j.message||'Part created'),'ok');
+    selectedPartLabel.value=j.name+' (ID '+j.pk+')';
+    selectedPartId.value=j.pk;uploadPartId.value=j.pk;
+    selectedPartThumb.onerror=()=>selectedPartThumb.removeAttribute('src');
+    selectedPartThumb.src='/api/part/image-proxy?pk='+j.pk+'&_='+Date.now();
+    window.currentPartId=j.pk;openPrintModal(j.pk);
+  }catch(e){setStatus('createStatus','❌ '+e.message,'err')}
+};
+
+// UPLOAD IMAGE
+document.getElementById('btnUpload').onclick=async()=>{
+  const pid=document.getElementById('uploadPartId').value.trim();
+  const file=document.getElementById('uploadFile').files[0];
+  if(!pid){setStatus('uploadStatus','❌ Part ID required','err');return}
+  if(!file){setStatus('uploadStatus','❌ Pick an image','err');return}
+  setStatus('uploadStatus','Uploading…','loading');
+  const fd=new FormData();fd.append('part_id',pid);fd.append('image',file);
+  try{
+    const r=await fetch('/api/upload',{method:'POST',body:fd});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||'Upload failed');
+    setStatus('uploadStatus','✅ Image uploaded','ok');
+    selectedPartThumb.src='/api/part/image-proxy?pk='+pid+'&_='+Date.now();
+    if(document.getElementById('kioskPartId').value==pid)
+      kioskThumb.src='/api/part/image-proxy?pk='+pid+'&_='+Date.now();
+  }catch(e){setStatus('uploadStatus','❌ '+e.message,'err')}
+};
+document.getElementById('selectedPartId').addEventListener('change',()=>{uploadPartId.value=document.getElementById('selectedPartId').value});
+
+// KIOSK
+const kioskPartId=document.getElementById('kioskPartId');
+const kioskPartLabel=document.getElementById('kioskPartLabel');
+const kioskThumb=document.getElementById('kioskThumb');
+const stockList=document.getElementById('stockList');
+const stockEmpty=document.getElementById('stockEmpty');
+kioskThumb.addEventListener('click',()=>openImageModal(kioskThumb.src));
+
+attachTypeahead({
+  inputEl:document.getElementById('kioskQuery'),
+  listEl:document.getElementById('kioskSearchList'),
+  onQuery:async q=>{
+    const rows=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=10');
+    return rows.map(r=>({pk:r.pk,label:r.name+(r.ipn?' (IPN: '+r.ipn+')':'')}));
+  },
+  onPick:({pk,label})=>loadKioskPart(pk,label)
+});
+
+document.getElementById('kioskQuery').addEventListener('keydown',async e=>{
+  if(e.key!=='Enter')return;
+  const q=document.getElementById('kioskQuery').value.trim();if(!q)return;
+  if(/^\d+$/.test(q)){
+    try{const p=await apiGET('/api/part/by-id?pk='+q);return loadKioskPart(p.pk,p.name+(p.ipn?' (IPN: '+p.ipn+')':''))}catch{}
+  }
+  try{
+    const rows=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=1');
+    if(rows.length)loadKioskPart(rows[0].pk,rows[0].name+(rows[0].ipn?' (IPN: '+rows[0].ipn+')':''));
+    else document.getElementById('kioskStatus').textContent='No results found.';
+  }catch(e){document.getElementById('kioskStatus').textContent='❌ '+e.message}
+});
+
+async function loadKioskPart(pk,label){
+  kioskPartId.value=pk;kioskPartLabel.value=label||'ID '+pk;
+  document.getElementById('kioskStatus').textContent='Part ID: '+pk;
+  kioskThumb.onerror=()=>kioskThumb.removeAttribute('src');
+  kioskThumb.src='/api/part/image-proxy?pk='+pk+'&_='+Date.now();
+  await refreshStock(pk);await window.kioskEnablePrintPanel(pk);
+}
+
+async function refreshStock(partId){
+  try{
+    const items=await apiGET('/api/stock/by-part?part_id='+partId);
+    stockList.innerHTML='';
+    const badge=document.getElementById('stockCountBadge');
+    if(!items.length){stockEmpty.style.display='flex';badge.textContent='0 items';return}
+    stockEmpty.style.display='none';badge.textContent=items.length+' item'+(items.length!==1?'s':'');
+    for(const it of items){
+      const id=it.pk;const row=document.createElement('div');row.className='stock-item';
+      row.innerHTML=
+        '<input type="checkbox" class="stock-check chk" value="'+id+'" title="Select for printing">'+
+        '<div class="stock-info">'+
+          '<div class="stock-id">Stock #'+id+'</div>'+
+          '<div class="s-loc">📍 '+(it.location_path||'No location')+'</div>'+
+          (it.batch?'<div style="font-size:11px;color:var(--text-3);margin-top:2px">Batch: '+it.batch+'</div>':'')+
+          (it.serial?'<div style="font-size:11px;color:var(--text-3);margin-top:2px">Serial: '+it.serial+'</div>':'')+
+        '</div>'+
+        '<div class="stock-qty">'+it.quantity+'<small>units</small></div>'+
+        '<div class="stock-actions">'+
+          '<input class="qty-input" placeholder="Remove…" inputmode="decimal" id="rm-'+id+'">'+
+          '<button class="btn sm danger" id="btn-rm-'+id+'">− Remove</button>'+
+          '<input class="qty-input" placeholder="Add…" inputmode="decimal" id="ad-'+id+'">'+
+          '<button class="btn sm ok" id="btn-ad-'+id+'">+ Add</button>'+
+        '</div>';
+      stockList.appendChild(row);
+      document.getElementById('btn-rm-'+id).onclick=async()=>{
+        const v=parseFloat((document.getElementById('rm-'+id).value||'').replace(',','.'));
+        if(!(v>0))return;await adjustQty('remove',id,v);
+      };
+      document.getElementById('btn-ad-'+id).onclick=async()=>{
+        const v=parseFloat((document.getElementById('ad-'+id).value||'').replace(',','.'));
+        if(!(v>0))return;await adjustQty('add',id,v);
+      };
+    }
+  }catch(e){stockList.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>'+e.message+'</p></div>'}
+}
+
+async function adjustQty(kind,stockId,qty){
+  try{
+    await apiPOST(kind==='add'?'/api/stock/add_qty':'/api/stock/remove_qty',{stock_id:stockId,quantity:qty,notes:'Kiosk adjust'});
+    await refreshStock(kioskPartId.value);
+  }catch(e){alert('Adjust failed: '+e.message)}
+}
+
+// PRINT PANEL
+async function refreshPrintPlugins(){
+  try{
+    const data=await(await fetch('/api/plugins/label?active=true')).json();
+    const sel=document.getElementById('label-plugin');
+    sel.innerHTML='<option value="">(default)</option>';
+    (data||[]).forEach(p=>{const o=document.createElement('option');o.value=p.pk;o.textContent=p.name;sel.appendChild(o)});
+  }catch{}
+}
+async function refreshPrintTemplates(){
+  const model=document.getElementById('label-model').value;
+  try{
+    const data=await(await fetch('/api/labels/templates?model_type='+encodeURIComponent(model)+'&enabled=true')).json();
+    const sel=document.getElementById('label-template');sel.innerHTML='';
+    (data||[]).forEach(t=>{const o=document.createElement('option');o.value=t.pk;o.textContent=t.name+' ('+t.model_type+')';sel.appendChild(o)});
+  }catch{}
+}
+document.getElementById('label-model').addEventListener('change',refreshPrintTemplates);
+document.getElementById('btn-load-templates').addEventListener('click',refreshPrintTemplates);
+document.getElementById('btn-print').addEventListener('click',async()=>{
+  const status=document.getElementById('print-status');
+  const model=document.getElementById('label-model').value;
+  const templateId=Number(document.getElementById('label-template').value);
+  const pluginVal=document.getElementById('label-plugin').value;
+  const pluginId=pluginVal?Number(pluginVal):null;
+  if(!templateId){setStatus(status,'Pick a template first','err');return}
+  let items=[];
+  if(model==='stockitem'){
+    const checks=Array.from(document.querySelectorAll('#stockList .chk:checked'));
+    if(!checks.length){setStatus(status,'Select at least one stock item','err');return}
+    items=checks.map(c=>Number(c.value));
+  }else if(model==='part'){
+    if(!window.currentPartId){setStatus(status,'No part selected','err');return}
+    items=[Number(window.currentPartId)];
+  }else{setStatus(status,'Stock location printing not wired','err');return}
+  setStatus(status,'Sending print job…','loading');
+  try{
+    const body={template_id:templateId,items};if(pluginId!==null)body.plugin_id=pluginId;
+    const res=await fetch('/api/labels/print',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok)throw new Error(await res.text());
+    setStatus(status,'🖨 Print job sent','ok');
+  }catch(e){setStatus(status,'❌ '+e.message,'err')}
+});
+window.kioskEnablePrintPanel=async function(partId){
+  window.currentPartId=partId;
+  const card=document.getElementById('print-card');if(card)card.style.display='';
+  const modelSel=document.getElementById('label-model');if(modelSel)modelSel.value='stockitem';
+  await refreshPrintPlugins();await refreshPrintTemplates();
+};
+
+// SEARCH PAGE
+let _searchInit=false;
+let searchState={q:'',offset:0,limit:24,loading:false,done:false};
+function ensureSearchInitialized(){if(_searchInit)return;_searchInit=true;resetSearch('')}
+function esc(s){return(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function parseWords(q){return(q||'').toLowerCase().split(/\s+/).map(w=>w.trim()).filter(Boolean)}
+function matchesAllWords(part,words){
+  if(!words.length)return true;
+  const blob=(part.name||'')+' '+(part.ipn||'')+' '+(part.description||'');
+  return words.every(w=>blob.toLowerCase().includes(w));
+}
+async function fetchPartsPage(q,offset,limit){
+  const u=new URL(location.origin+'/api/parts');
+  if(q)u.searchParams.set('q',q);
+  u.searchParams.set('limit',String(limit));u.searchParams.set('offset',String(offset));
+  return await apiGET(u.pathname+u.search);
+}
+async function fillStockTotal(cardEl,partId){
+  try{
+    const items=await apiGET('/api/stock/by-part?part_id='+partId);
+    const total=(items||[]).reduce((a,it)=>a+(parseFloat(it.quantity)||0),0);
+    const span=cardEl.querySelector('.pc-stock');if(span)span.textContent=total+' in stock';
+  }catch{const s=cardEl.querySelector('.pc-stock');if(s)s.textContent='0 in stock'}
+}
+async function renderSearch({reset=false}={}){
+  if(searchState.loading||(searchState.done&&!reset))return;
+  const words=parseWords(searchState.q);
+  const searchStatus=document.getElementById('searchStatus');
+  const searchGrid=document.getElementById('searchGrid');
+  const btnSearchMore=document.getElementById('btnSearchMore');
+  if(reset){
+    searchState.offset=0;searchState.done=false;searchGrid.innerHTML='';
+    setStatus(searchStatus,words.length?'Searching: '+words.join(' AND '):'Browsing all parts');
+  }
+  searchState.loading=true;btnSearchMore.style.display='none';
+  try{
+    const page=await fetchPartsPage(words[0]||'',searchState.offset,searchState.limit);
+    const filtered=page.filter(p=>matchesAllWords(p,words));
+    if(!filtered.length&&!page.length){
+      if(!searchState.offset){searchGrid.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">🔍</div><p>No parts found.</p></div>';setStatus(searchStatus,'')}
+      searchState.done=true;return;
+    }
+    for(const p of filtered){
+      const card=document.createElement('div');card.className='part-card';
+      const label=p.name+(p.ipn?' (IPN: '+p.ipn+')':'');
+      const imgUrl='/api/part/image-proxy?pk='+p.pk+'&_='+Date.now();
+      card.innerHTML=
+        '<img src="'+imgUrl+'" alt="'+esc(p.name||'')+'" onerror="this.style.display=\'none\'">'+
+        '<div class="pc-name">'+esc(p.name||'Unnamed')+'</div>'+
+        (p.ipn?'<div class="pc-meta">IPN: '+esc(p.ipn)+'</div>':'')+
+        '<div class="pc-stock">— in stock</div>';
+      card.addEventListener('click',()=>{showPage('kiosk');loadKioskPart(p.pk,label)});
+      card.querySelector('img')?.addEventListener('click',e=>{e.stopPropagation();openImageModal(imgUrl)});
+      searchGrid.appendChild(card);fillStockTotal(card,p.pk);
+    }
+    searchState.offset+=page.length;
+    btnSearchMore.style.display=(page.length>=searchState.limit)?'':'none';
+    if(page.length<searchState.limit)searchState.done=true;
+  }catch(e){setStatus(document.getElementById('searchStatus'),'❌ '+e.message,'err')}
+  finally{searchState.loading=false}
+}
+function resetSearch(q){searchState.q=q||'';renderSearch({reset:true})}
+document.getElementById('btnSearchGo').addEventListener('click',()=>resetSearch(document.getElementById('searchInput').value));
+document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')resetSearch(document.getElementById('searchInput').value)});
+document.getElementById('btnSearchMore').addEventListener('click',()=>renderSearch({reset:false}));
 </script>
 </body>
 </html>
