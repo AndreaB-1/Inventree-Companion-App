@@ -120,6 +120,16 @@ def index():
     return FileResponse("static/index.html")
 
 
+@app.get("/manifest.json")
+def manifest():
+    return FileResponse("static/manifest.json", media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse("static/sw.js", media_type="application/javascript")
+
+
 # ----------------- Parts & Locations -----------------
 
 @app.get("/api/part/by-ipn")
