@@ -4,6 +4,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>InvenTree Companion</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#3b82f6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="InvenTree Companion">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <style>
@@ -1010,6 +1016,11 @@ function resetSearch(q){searchState.q=q||'';renderSearch({reset:true})}
 document.getElementById('btnSearchGo').addEventListener('click',()=>resetSearch(document.getElementById('searchInput').value));
 document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')resetSearch(document.getElementById('searchInput').value)});
 document.getElementById('btnSearchMore').addEventListener('click',()=>renderSearch({reset:false}));
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
 </script>
 </body>
 </html>
