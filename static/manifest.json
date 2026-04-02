@@ -3,7 +3,7 @@
   "short_name": "InvenTree",
   "description": "Smart companion app for InvenTree inventory management",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#080c12",
   "theme_color": "#3b82f6",
