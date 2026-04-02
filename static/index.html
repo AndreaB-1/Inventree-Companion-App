@@ -109,17 +109,18 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .backdrop{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:45;
   backdrop-filter:blur(3px);opacity:0;transition:opacity var(--trans-slow);
+  pointer-events:none;
 }
-.backdrop.show{opacity:1}
+.backdrop.show{opacity:1;pointer-events:all}
 
 @media(max-width:860px){
   .app{grid-template-columns:1fr}
   .sidebar{
     position:fixed;inset:0 auto 0 0;width:min(var(--nav-w),82vw);
     transform:translateX(-100%);transition:transform var(--trans-slow);
-    box-shadow:var(--shadow);
+    box-shadow:var(--shadow);pointer-events:none;
   }
-  .sidebar.open{transform:translateX(0)}
+  .sidebar.open{transform:translateX(0);pointer-events:all}
   .topbar{display:flex}
   .backdrop{display:block}
 }
@@ -306,6 +307,9 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
   .parts-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}
   .stock-item{grid-template-columns:auto 1fr}
   .stock-qty{grid-column:1/-1;text-align:left}
+  .stock-actions{overflow-x:visible}
+  .qty-input{width:72px}
+  body{overflow-x:hidden}
 }
 </style>
 </head>
