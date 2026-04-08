@@ -285,7 +285,7 @@ class ImageDownloadReq(BaseModel):
 @app.post("/api/part/image-search")
 def part_image_search(req: ImageSearchReq):
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
         results = []
         with DDGS() as ddgs:
             for r in ddgs.images(req.query, max_results=6):
