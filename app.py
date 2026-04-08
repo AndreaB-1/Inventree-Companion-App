@@ -282,6 +282,39 @@ class ImageDownloadReq(BaseModel):
     part_id: str
     image_url: str
 
+
+# ----------------- Part Metadata Update -----------------
+
+class PartUpdateReq(BaseModel):
+    pk: int
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+@app.post("/api/part/update-meta")
+def update_part_meta(req: PartUpdateReq):
+    data = {}
+    if req.name is not None:
+        data["name"] = req.name
+    if req.description is not None:
+        data["description"] = req.description
+    if not data:
+        return {"ok": True, "message": "Nothing to update"}
+    try:
+        inv_url = INVENTREE_URL.rstrip("/")
+        resp = requests.patch(
+            f"{inv_url}/part/{req.pk}/",
+            json=data,
+            headers={"Authorization": f"Token {INVENTREE_TOKEN}"},
+            timeout=15,
+        )
+        if not resp.ok:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text[:300])
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/part/image-search")
 def part_image_search(req: ImageSearchReq):
     try:

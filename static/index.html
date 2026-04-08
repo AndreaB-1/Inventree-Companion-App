@@ -317,6 +317,22 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
   .qty-input{width:72px}
   body{overflow-x:hidden}
 }
+
+/* Naming Standards page */
+.std-row{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--border)}
+.std-row:last-child{border-bottom:none}
+.std-thumb{width:52px;height:52px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0;background:var(--surface-2)}
+.std-content{flex:1;min-width:0}
+.std-field{margin-bottom:8px}
+.std-field:last-child{margin-bottom:0}
+.std-label{font-size:10.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.std-cur{font-size:13px;color:var(--text-1);word-break:break-word}
+.std-sug{font-size:13px;color:var(--accent);word-break:break-word;margin-top:3px;display:none}
+.std-sug::before{content:'→ ';opacity:.6}
+.std-unchanged{font-size:12px;color:var(--text-3);font-style:italic;margin-top:3px;display:none}
+.std-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;padding-top:2px}
+.std-ipn{font-size:11px;color:var(--text-3);margin-bottom:6px}
+@media(max-width:520px){.std-thumb{width:40px;height:40px}.std-actions{flex-direction:row;flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -344,6 +360,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       <button id="nav-search" class="nav-item" onclick="showPage('search')">
         <span class="ni-icon">🔎</span>
         <span class="ni-label">Search Parts</span>
+      </button>
+      <button id="nav-standards" class="nav-item" onclick="showPage('standards')">
+        <span class="ni-icon">🧹</span>
+        <span class="ni-label">Naming Standards</span>
       </button>
 
       <div class="sidebar-footer">
@@ -587,6 +607,34 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       </div>
     </section>
 
+    <!-- STANDARDS PAGE -->
+    <section id="page-standards" class="page">
+      <div class="page-header">
+        <div class="page-icon">🧹</div>
+        <div class="page-header-text">
+          <h1>Naming Standards</h1>
+          <p>AI-assisted review of part names and descriptions</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="btn-row" style="flex-wrap:wrap;gap:8px">
+          <button class="btn primary" id="btnStdLoad">Load Parts</button>
+          <button class="btn" id="btnStdAnalyzeAll" disabled>✨ Analyze All</button>
+          <button class="btn ok" id="btnStdAcceptAll" style="display:none">✅ Accept All Changes</button>
+          <div class="status-line" id="stdStatus"></div>
+        </div>
+        <p style="margin-top:10px;font-size:11.5px;color:var(--text-3)">Loads all parts in batches of 30. Click <strong>Analyze All</strong> to run AI on every loaded part, or <strong>✨ Analyze</strong> on individual rows. Suggestions marked in blue — accept to save to InvenTree.</p>
+      </div>
+
+      <div class="card" id="stdCard" style="display:none">
+        <div id="stdList"></div>
+        <div style="display:flex;justify-content:center;margin-top:14px">
+          <button class="btn" id="btnStdMore" style="display:none">Load more</button>
+        </div>
+      </div>
+    </section>
+
   </div>
 </div>
 
@@ -650,7 +698,7 @@ backdrop.onclick=()=>{sidebar.classList.remove('open');backdrop.classList.remove
 
 // PAGES
 function showPage(id){
-  ['add','kiosk','search'].forEach(p=>{
+  ['add','kiosk','search','standards'].forEach(p=>{
     document.getElementById('page-'+p).classList.toggle('active',p===id);
     document.getElementById('nav-'+p).classList.toggle('active',p===id);
   });
@@ -1088,6 +1136,180 @@ function resetSearch(q){searchState.q=q||'';renderSearch({reset:true})}
 document.getElementById('btnSearchGo').addEventListener('click',()=>resetSearch(document.getElementById('searchInput').value));
 document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')resetSearch(document.getElementById('searchInput').value)});
 document.getElementById('btnSearchMore').addEventListener('click',()=>renderSearch({reset:false}));
+
+// ===================== NAMING STANDARDS PAGE =====================
+function escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+let _stdOffset=0;
+const _stdLimit=30;
+const _stdParts={};       // pk -> {name, description, ipn}
+const _stdSuggestions={}; // pk -> {name, description}
+
+function stdRenderRow(p){
+  const el=document.createElement('div');
+  el.className='std-row';el.id='std-row-'+p.pk;
+  const ipnHtml=p.ipn?`<div class="std-ipn">IPN: ${escHtml(p.ipn)}</div>`:'';
+  el.innerHTML=`
+    <img class="std-thumb" src="/api/part/image-proxy?pk=${p.pk}" onerror="this.style.visibility='hidden'" alt="">
+    <div class="std-content">
+      ${ipnHtml}
+      <div class="std-field">
+        <div class="std-label">Name</div>
+        <div class="std-cur std-cur-name">${escHtml(p.name)}</div>
+        <div class="std-sug std-sug-name"></div>
+        <div class="std-unchanged std-unch-name">✓ Name already correct</div>
+      </div>
+      <div class="std-field">
+        <div class="std-label">Description</div>
+        <div class="std-cur std-cur-desc">${escHtml(p.description||'—')}</div>
+        <div class="std-sug std-sug-desc"></div>
+        <div class="std-unchanged std-unch-desc">✓ Description already correct</div>
+      </div>
+      <div class="status-line std-row-status" style="margin-top:6px"></div>
+    </div>
+    <div class="std-actions">
+      <button class="btn sm std-btn-analyze" onclick="stdAnalyzePart(${p.pk})">✨</button>
+      <button class="btn ok sm std-btn-accept" style="display:none" onclick="stdAcceptPart(${p.pk})">✅</button>
+      <button class="btn sm std-btn-skip" style="display:none" onclick="stdSkipPart(${p.pk})">⏭</button>
+    </div>`;
+  return el;
+}
+
+async function stdLoadParts(reset=false){
+  if(reset){_stdOffset=0;Object.keys(_stdParts).forEach(k=>delete _stdParts[k]);Object.keys(_stdSuggestions).forEach(k=>delete _stdSuggestions[k]);}
+  const btn=document.getElementById('btnStdLoad');
+  btn.disabled=true;
+  setStatus('stdStatus','Loading…','loading');
+  try{
+    const rows=await apiGET(`/api/parts?limit=${_stdLimit}&offset=${_stdOffset}`);
+    if(reset)document.getElementById('stdList').innerHTML='';
+    document.getElementById('stdCard').style.display='';
+    const list=document.getElementById('stdList');
+    for(const p of rows){
+      _stdParts[p.pk]={name:p.name||'',description:p.description||'',ipn:p.ipn||''};
+      list.appendChild(stdRenderRow(p));
+    }
+    _stdOffset+=rows.length;
+    document.getElementById('btnStdMore').style.display=rows.length>=_stdLimit?'':'none';
+    document.getElementById('btnStdAnalyzeAll').disabled=false;
+    setStatus('stdStatus',`${_stdOffset} part(s) loaded`,'ok');
+  }catch(e){setStatus('stdStatus','❌ '+e.message,'err')}
+  finally{btn.disabled=false}
+}
+
+async function stdAnalyzePart(pk){
+  const row=document.getElementById('std-row-'+pk);if(!row)return;
+  const btn=row.querySelector('.std-btn-analyze');
+  const statusEl=row.querySelector('.std-row-status');
+  btn.disabled=true;btn.textContent='…';
+  setStatus(statusEl,'Analyzing…','loading');
+  const cur=_stdParts[pk]||{name:'',description:''};
+  const prompt=[cur.name,cur.description].filter(Boolean).join(' — ');
+  try{
+    const res=await apiPOST('/api/ai/suggest-part',{prompt,strict:false});
+    const sugName=(res.name||'').trim();
+    const sugDesc=(res.description||'').trim();
+    const nameChanged=sugName&&sugName!==cur.name;
+    const descChanged=sugDesc&&sugDesc!==cur.description;
+    const nameEl=row.querySelector('.std-sug-name');
+    const descEl=row.querySelector('.std-sug-desc');
+    const nameUnch=row.querySelector('.std-unch-name');
+    const descUnch=row.querySelector('.std-unch-desc');
+    const acceptBtn=row.querySelector('.std-btn-accept');
+    const skipBtn=row.querySelector('.std-btn-skip');
+    // reset previous state
+    nameEl.style.display='none';descEl.style.display='none';
+    nameUnch.style.display='none';descUnch.style.display='none';
+    if(nameChanged){nameEl.textContent=sugName;nameEl.style.display='';}
+    else{nameUnch.style.display='';}
+    if(descChanged){descEl.textContent=sugDesc;descEl.style.display='';}
+    else{descUnch.style.display='';}
+    if(nameChanged||descChanged){
+      _stdSuggestions[pk]={name:nameChanged?sugName:cur.name,description:descChanged?sugDesc:cur.description};
+      acceptBtn.style.display='';skipBtn.style.display='';
+      setStatus(statusEl,'','');
+      stdRefreshAcceptAll();
+    }else{
+      setStatus(statusEl,'✓ Already follows convention','ok');
+    }
+  }catch(e){setStatus(statusEl,'❌ '+e.message,'err')}
+  finally{btn.disabled=false;btn.textContent='✨';}
+}
+
+function stdSkipPart(pk){
+  const row=document.getElementById('std-row-'+pk);if(!row)return;
+  row.querySelector('.std-sug-name').style.display='none';
+  row.querySelector('.std-sug-desc').style.display='none';
+  row.querySelector('.std-unch-name').style.display='none';
+  row.querySelector('.std-unch-desc').style.display='none';
+  row.querySelector('.std-btn-accept').style.display='none';
+  row.querySelector('.std-btn-skip').style.display='none';
+  setStatus(row.querySelector('.std-row-status'),'Skipped','');
+  delete _stdSuggestions[pk];
+  stdRefreshAcceptAll();
+}
+
+async function stdAcceptPart(pk){
+  const row=document.getElementById('std-row-'+pk);if(!row)return;
+  const sug=_stdSuggestions[pk];if(!sug)return;
+  const acceptBtn=row.querySelector('.std-btn-accept');
+  const statusEl=row.querySelector('.std-row-status');
+  acceptBtn.disabled=true;acceptBtn.textContent='…';
+  try{
+    await apiPOST('/api/part/update-meta',{pk:Number(pk),name:sug.name,description:sug.description});
+    _stdParts[pk]={..._stdParts[pk],...sug};
+    row.querySelector('.std-cur-name').textContent=sug.name;
+    row.querySelector('.std-cur-desc').textContent=sug.description||'—';
+    row.querySelector('.std-sug-name').style.display='none';
+    row.querySelector('.std-sug-desc').style.display='none';
+    row.querySelector('.std-unch-name').style.display='none';
+    row.querySelector('.std-unch-desc').style.display='none';
+    row.querySelector('.std-btn-accept').style.display='none';
+    row.querySelector('.std-btn-skip').style.display='none';
+    setStatus(statusEl,'✅ Updated','ok');
+    delete _stdSuggestions[pk];
+    stdRefreshAcceptAll();
+  }catch(e){
+    setStatus(statusEl,'❌ '+e.message,'err');
+    acceptBtn.disabled=false;acceptBtn.textContent='✅';
+  }
+}
+
+async function stdAnalyzeAll(){
+  const btn=document.getElementById('btnStdAnalyzeAll');
+  btn.disabled=true;btn.textContent='Analyzing…';
+  const pks=Object.keys(_stdParts);
+  let done=0;
+  for(const pk of pks){
+    setStatus('stdStatus',`Analyzing ${++done}/${pks.length}…`,'loading');
+    await stdAnalyzePart(Number(pk));
+    await new Promise(r=>setTimeout(r,150));
+  }
+  setStatus('stdStatus',`Done — ${pks.length} part(s) analyzed`,'ok');
+  btn.disabled=false;btn.textContent='✨ Analyze All';
+  stdRefreshAcceptAll();
+}
+
+async function stdAcceptAll(){
+  const pks=Object.keys(_stdSuggestions);
+  const btn=document.getElementById('btnStdAcceptAll');
+  btn.disabled=true;btn.textContent='Saving…';
+  let count=0;
+  for(const pk of pks){await stdAcceptPart(Number(pk));count++;}
+  setStatus('stdStatus',`✅ Applied ${count} update(s)`,'ok');
+  btn.disabled=false;btn.textContent='✅ Accept All Changes';
+  stdRefreshAcceptAll();
+}
+
+function stdRefreshAcceptAll(){
+  const hasPending=Object.keys(_stdSuggestions).length>0;
+  document.getElementById('btnStdAcceptAll').style.display=hasPending?'':'none';
+}
+
+document.getElementById('btnStdLoad').onclick=()=>stdLoadParts(true);
+document.getElementById('btnStdMore').onclick=()=>stdLoadParts(false);
+document.getElementById('btnStdAnalyzeAll').onclick=stdAnalyzeAll;
+document.getElementById('btnStdAcceptAll').onclick=stdAcceptAll;
 </script>
 <script>
 if ('serviceWorker' in navigator) {
