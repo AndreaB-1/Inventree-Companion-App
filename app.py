@@ -275,6 +275,13 @@ def part_image_url(pk: str):
 
 # ----------------- Image Search / Auto-Download -----------------
 
+class ImageSearchReq(BaseModel):
+    query: str
+
+class ImageDownloadReq(BaseModel):
+    part_id: str
+    image_url: str
+
 @app.post("/api/part/image-search")
 def part_image_search(req: ImageSearchReq):
     try:
@@ -627,13 +634,6 @@ class AISuggestReq(BaseModel):
     language: Optional[str] = None      # e.g. "en" or "it"
     name_only: Optional[bool] = False
     strict: Optional[bool] = True       # default ON
-
-class ImageSearchReq(BaseModel):
-    query: str
-
-class ImageDownloadReq(BaseModel):
-    part_id: str
-    image_url: str
 
 def _fallback_desc_from_name(name: str) -> str:
     return name
