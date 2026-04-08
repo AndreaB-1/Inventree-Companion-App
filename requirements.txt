@@ -8,3 +8,4 @@ numpy
 pyzbar
 openai
 requests
+duckduckgo-search

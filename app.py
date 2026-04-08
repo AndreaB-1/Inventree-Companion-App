@@ -273,6 +273,63 @@ def part_image_url(pk: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ----------------- Image Search / Auto-Download -----------------
+
+@app.post("/api/part/image-search")
+def part_image_search(req: ImageSearchReq):
+    try:
+        from duckduckgo_search import DDGS
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.images(req.query, max_results=6):
+                url = r.get("image") or r.get("url")
+                if url:
+                    results.append(url)
+                if len(results) >= 6:
+                    break
+        return {"images": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/part/image-download")
+def part_image_download(req: ImageDownloadReq):
+    tmp_path = None
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            )
+        }
+        resp = requests.get(req.image_url, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Image host returned HTTP {resp.status_code}")
+        img = Image.open(BytesIO(resp.content)).convert("RGB")
+        w, h = img.size
+        s = min(w, h)
+        left = (w - s) // 2
+        top = (h - s) // 2
+        img = img.crop((left, top, left + s, top + s)).resize((800, 800), Image.LANCZOS)
+        fd, tmp_path = tempfile.mkstemp(prefix="inventree_imgdl_", suffix=".jpg")
+        os.close(fd)
+        img.save(tmp_path, "JPEG", quality=92)
+        api = inv_api()
+        Part(api, pk=str(req.part_id)).uploadImage(tmp_path)
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+
+
 # ----------------- Image Upload -----------------
 
 @app.post("/api/upload")
@@ -570,6 +627,13 @@ class AISuggestReq(BaseModel):
     language: Optional[str] = None      # e.g. "en" or "it"
     name_only: Optional[bool] = False
     strict: Optional[bool] = True       # default ON
+
+class ImageSearchReq(BaseModel):
+    query: str
+
+class ImageDownloadReq(BaseModel):
+    part_id: str
+    image_url: str
 
 def _fallback_desc_from_name(name: str) -> str:
     return name

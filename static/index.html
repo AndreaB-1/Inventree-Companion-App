@@ -608,6 +608,26 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
   </div>
 </div>
 
+<!-- IMAGE SUGGESTION MODAL -->
+<div id="imgSuggestModal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:480px">
+    <h3>🖼 Image Suggestion</h3>
+    <p id="imgSuggestCounter" style="margin-bottom:12px;color:var(--text-3);font-size:12px"></p>
+    <img id="imgSuggestPreview" alt="Suggested image"
+         style="width:100%;height:260px;object-fit:contain;border-radius:var(--radius-sm);
+                background:var(--surface-2);display:block;margin-bottom:14px">
+    <div id="imgSuggestError" class="status-line err" style="display:none;margin-bottom:10px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <button class="btn sm" id="imgSuggestPrev">&#8592; Prev</button>
+      <button class="btn sm" id="imgSuggestNext">Next &#8594;</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="imgSuggestSkip">&#9197; Skip</button>
+      <button class="btn ok" id="imgSuggestUse">&#9989; Use this image</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // THEME
 function applyTheme(t){
@@ -698,7 +718,7 @@ function closeImageModal(e){
   if(e&&e.target!==imgModal)return;
   imgModal.classList.remove('show');imgModalPic.removeAttribute('src');
 }
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){imgModal.classList.remove('show');closePrintModal()}});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){imgModal.classList.remove('show');closePrintModal();closeImgSuggestModal()}});
 
 // ADD PAGE – Part Search
 const selectedPartLabel=document.getElementById('selectedPartLabel');
@@ -771,6 +791,53 @@ document.getElementById('modalYes').onclick=async()=>{
   }catch(e){setStatus('createStatus','❌ '+e.message,'err')}
 };
 
+// IMAGE SUGGESTION
+const imgSuggestModal=document.getElementById('imgSuggestModal');
+let _imgSuggestUrls=[],_imgSuggestIdx=0,_imgSuggestPartId=null;
+function openImgSuggestModal(urls,partId){
+  _imgSuggestUrls=urls;_imgSuggestIdx=0;_imgSuggestPartId=partId;
+  _renderImgSuggest();imgSuggestModal.classList.add('show');
+}
+function closeImgSuggestModal(){
+  imgSuggestModal.classList.remove('show');
+  document.getElementById('imgSuggestPreview').removeAttribute('src');
+}
+function _renderImgSuggest(){
+  const total=_imgSuggestUrls.length;
+  document.getElementById('imgSuggestCounter').textContent='Image '+(_imgSuggestIdx+1)+' of '+total;
+  document.getElementById('imgSuggestError').style.display='none';
+  const preview=document.getElementById('imgSuggestPreview');
+  preview.removeAttribute('src');preview.src=_imgSuggestUrls[_imgSuggestIdx];
+  preview.onerror=()=>{
+    document.getElementById('imgSuggestError').textContent='Could not load this image. Try next.';
+    document.getElementById('imgSuggestError').style.display='flex';
+  };
+  document.getElementById('imgSuggestPrev').disabled=(_imgSuggestIdx===0);
+  document.getElementById('imgSuggestNext').disabled=(_imgSuggestIdx===total-1);
+}
+document.getElementById('imgSuggestPrev').onclick=()=>{if(_imgSuggestIdx>0){_imgSuggestIdx--;_renderImgSuggest();}};
+document.getElementById('imgSuggestNext').onclick=()=>{if(_imgSuggestIdx<_imgSuggestUrls.length-1){_imgSuggestIdx++;_renderImgSuggest();}};
+document.getElementById('imgSuggestSkip').onclick=closeImgSuggestModal;
+document.getElementById('imgSuggestUse').onclick=async()=>{
+  const btn=document.getElementById('imgSuggestUse');
+  const errEl=document.getElementById('imgSuggestError');
+  btn.disabled=true;btn.textContent='Uploading…';errEl.style.display='none';
+  try{
+    await apiPOST('/api/part/image-download',{part_id:String(_imgSuggestPartId),image_url:_imgSuggestUrls[_imgSuggestIdx]});
+    closeImgSuggestModal();
+    const ts='&_='+Date.now();
+    selectedPartThumb.src='/api/part/image-proxy?pk='+_imgSuggestPartId+ts;
+    if(document.getElementById('kioskPartId').value==_imgSuggestPartId)
+      kioskThumb.src='/api/part/image-proxy?pk='+_imgSuggestPartId+ts;
+    setStatus('createStatus','✅ Image applied','ok');
+  }catch(e){
+    errEl.textContent='❌ '+e.message+' — try another image.';
+    errEl.style.display='flex';
+  }finally{
+    btn.disabled=false;btn.textContent='✅ Use this image';
+  }
+};
+
 document.getElementById('btnCreate').onclick=async()=>{
   const name=document.getElementById('newName').value.trim();
   const description=document.getElementById('newDesc').value.trim();
@@ -795,6 +862,11 @@ document.getElementById('btnCreate').onclick=async()=>{
     selectedPartThumb.onerror=()=>selectedPartThumb.removeAttribute('src');
     selectedPartThumb.src='/api/part/image-proxy?pk='+j.pk+'&_='+Date.now();
     window.currentPartId=j.pk;openPrintModal(j.pk);
+    // Fire-and-forget image search (non-blocking)
+    const imgQuery=[name,description].filter(Boolean).join(' ');
+    apiPOST('/api/part/image-search',{query:imgQuery})
+      .then(res=>{if(res.images&&res.images.length>0)openImgSuggestModal(res.images,j.pk);})
+      .catch(()=>{});
   }catch(e){setStatus('createStatus','❌ '+e.message,'err')}
 };
 
