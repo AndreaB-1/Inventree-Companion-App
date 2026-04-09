@@ -333,6 +333,31 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .std-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;padding-top:2px}
 .std-ipn{font-size:11px;color:var(--text-3);margin-bottom:6px}
 @media(max-width:520px){.std-thumb{width:40px;height:40px}.std-actions{flex-direction:row;flex-wrap:wrap}}
+
+/* ── Label Printer page ── */
+.hw-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.hw-type-btn{
+  all:unset;display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:10px 6px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);cursor:pointer;font-size:11px;color:var(--text-2);
+  transition:all var(--trans);text-align:center;user-select:none;
+}
+.hw-type-btn:hover{background:var(--surface-3);color:var(--text)}
+.hw-type-btn.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
+.hw-type-btn .hw-icon{font-size:22px;line-height:1}
+.label-preview-wrap{
+  background:#fff;border-radius:8px;padding:10px;
+  display:flex;justify-content:center;overflow-x:auto;min-height:60px;
+  border:1px solid var(--border);
+}
+.label-preview-wrap img{image-rendering:pixelated;max-width:100%;display:block}
+.hw-views{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:4px}
+.hw-view-box{display:flex;flex-direction:column;align-items:center;gap:5px}
+.hw-view-box img{border:1px solid var(--border);border-radius:8px;background:#fff;width:160px;height:160px;object-fit:contain}
+.hw-view-box span{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em}
+.lbl-opts-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lbl-checkbox{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer;user-select:none}
+.lbl-checkbox input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -368,6 +393,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       <button id="nav-edit" class="nav-item" onclick="showPage('edit')">
         <span class="ni-icon">✏️</span>
         <span class="ni-label">Edit Part</span>
+      </button>
+      <button id="nav-labels" class="nav-item" onclick="showPage('labels')">
+        <span class="ni-icon">🏷️</span>
+        <span class="ni-label">Label Printer</span>
       </button>
 
       <div class="sidebar-footer">
@@ -722,6 +751,102 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       </div>
     </section>
 
+    <!-- ══════════════ LABEL PRINTER PAGE ══════════════ -->
+    <section id="page-labels" class="page">
+      <div class="page-header">
+        <div class="page-icon">🏷️</div>
+        <div class="page-header-text">
+          <h1>Label Printer</h1>
+          <p>Generate and print hardware labels on 12 mm tape via Brother QL-710W</p>
+        </div>
+      </div>
+
+      <!-- Hardware Type -->
+      <div class="card">
+        <div class="card-header"><h2>Hardware Type</h2></div>
+        <div class="hw-type-grid" id="hwTypeGrid"></div>
+      </div>
+
+      <!-- Specifications -->
+      <div class="card" id="hwSpecCard" style="display:none">
+        <div class="card-header">
+          <h2 id="hwSpecTitle">Specifications</h2>
+          <span class="badge accent" id="hwSpecBadge"></span>
+        </div>
+        <div id="hwSpecForm"></div>
+      </div>
+
+      <!-- Label Options -->
+      <div class="card">
+        <div class="card-header"><h2>Label Options</h2><span class="badge">12 mm tape</span></div>
+        <div class="grid-2" style="gap:12px;margin-bottom:14px">
+          <div class="field">
+            <label>Label Length (mm)</label>
+            <input type="number" id="hwLabelLength" value="36" min="12" max="200" step="1">
+            <div class="field-hint">Tape width is fixed at 12 mm</div>
+          </div>
+          <div class="field">
+            <label>Copies</label>
+            <input type="number" id="hwCopies" value="1" min="1" max="99" step="1">
+          </div>
+        </div>
+        <div class="lbl-opts-grid">
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptDiagram" checked> Show diagram</label>
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptTopview" checked> Top view</label>
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptSideview" checked> Side view</label>
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptMaterial" checked> Material / grade</label>
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptStandard" checked> Standard</label>
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptGrade" checked> Show grade</label>
+        </div>
+      </div>
+
+      <!-- Printer -->
+      <div class="card">
+        <div class="card-header"><h2>Printer</h2><span class="badge">Brother QL-710W</span></div>
+        <div class="grid-2" style="gap:12px;margin-bottom:12px">
+          <div class="field">
+            <label>Printer Address</label>
+            <input type="text" id="hwPrinterAddr" placeholder="192.168.1.x  or  tcp://192.168.1.x">
+            <div class="field-hint">Network IP or tcp:// / usb:// URI</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="hwTestPrinter()">🔌 Test Connection</button>
+          <div class="status-line" id="hwPrinterStatus"></div>
+        </div>
+      </div>
+
+      <!-- Preview & Print -->
+      <div class="card">
+        <div class="card-header"><h2>Preview &amp; Print</h2></div>
+
+        <div class="hw-views" id="hwViews" style="display:none">
+          <div class="hw-view-box">
+            <img id="hwTopviewImg" src="" alt="Top view">
+            <span>Top view</span>
+          </div>
+          <div class="hw-view-box">
+            <img id="hwSideviewImg" src="" alt="Side view">
+            <span>Side view</span>
+          </div>
+        </div>
+
+        <div style="margin:12px 0 10px">
+          <p style="font-size:11px;color:var(--text-3);margin-bottom:6px">Label (actual print size, zoomed 3×)</p>
+          <div class="label-preview-wrap" id="hwLabelPreviewWrap">
+            <p style="font-size:12px;color:var(--text-3);padding:8px 0">Click Preview to generate</p>
+          </div>
+        </div>
+
+        <div class="status-line" id="hwLabelStatus" style="margin-bottom:10px"></div>
+        <div class="btn-row">
+          <button class="btn" onclick="hwPreviewLabel()">👁 Preview</button>
+          <button class="btn primary" onclick="hwPrintLabel()">🖨 Print</button>
+          <button class="btn sm" id="hwDownloadBtn" style="display:none" onclick="hwDownloadLabel()">⬇ Download</button>
+        </div>
+      </div>
+    </section>
+
   </div>
 </div>
 
@@ -785,12 +910,13 @@ backdrop.onclick=()=>{sidebar.classList.remove('open');backdrop.classList.remove
 
 // PAGES
 function showPage(id){
-  ['add','kiosk','search','standards','edit'].forEach(p=>{
+  ['add','kiosk','search','standards','edit','labels'].forEach(p=>{
     document.getElementById('page-'+p).classList.toggle('active',p===id);
     document.getElementById('nav-'+p).classList.toggle('active',p===id);
   });
   sidebar.classList.remove('open');backdrop.classList.remove('show');
   if(id==='search')ensureSearchInitialized();
+  if(id==='labels')initLabelsPage();
 }
 
 // HTTP
@@ -1476,6 +1602,302 @@ document.getElementById('btnStdLoad').onclick=()=>stdLoadParts(true);
 document.getElementById('btnStdMore').onclick=()=>stdLoadParts(false);
 document.getElementById('btnStdAnalyzeAll').onclick=stdAnalyzeAll;
 document.getElementById('btnStdAcceptAll').onclick=stdAcceptAll;
+
+// ══════════════ LABEL PRINTER ══════════════
+
+const METRIC_DIMS={
+  'M2':  {pitch:0.40,af:4.0, nut_h:1.6, w_id:2.2, w_od:5.0,  w_t:0.3},
+  'M2.5':{pitch:0.45,af:5.0, nut_h:2.0, w_id:2.7, w_od:6.0,  w_t:0.5},
+  'M3':  {pitch:0.50,af:5.5, nut_h:2.4, w_id:3.2, w_od:7.0,  w_t:0.5},
+  'M4':  {pitch:0.70,af:7.0, nut_h:3.2, w_id:4.3, w_od:9.0,  w_t:0.8},
+  'M5':  {pitch:0.80,af:8.0, nut_h:4.7, w_id:5.3, w_od:10.0, w_t:1.0},
+  'M6':  {pitch:1.00,af:10.0,nut_h:5.2, w_id:6.4, w_od:12.0, w_t:1.6},
+  'M8':  {pitch:1.25,af:13.0,nut_h:6.8, w_id:8.4, w_od:16.0, w_t:1.6},
+  'M10': {pitch:1.50,af:17.0,nut_h:8.4, w_id:10.5,w_od:20.0, w_t:2.0},
+  'M12': {pitch:1.75,af:19.0,nut_h:10.8,w_id:13.0,w_od:24.0, w_t:2.5},
+  'M16': {pitch:2.00,af:24.0,nut_h:14.8,w_id:17.0,w_od:30.0, w_t:3.0},
+  'M20': {pitch:2.50,af:30.0,nut_h:18.0,w_id:21.0,w_od:37.0, w_t:3.0},
+  'M24': {pitch:3.00,af:36.0,nut_h:21.5,w_id:25.0,w_od:44.0, w_t:4.0},
+};
+
+const THREAD_SIZES=['M2','M2.5','M3','M4','M5','M6','M8','M10','M12','M16','M20','M24'];
+const MATERIALS=['A2-304 Stainless','A4-316 Stainless','Carbon Steel','Alloy Steel','Zinc Plated','Black Oxide','Brass','Nylon','Titanium'];
+
+const HW_TYPES={
+  screw:{label:'Screw / Bolt',icon:'🔩',fields:[
+    {id:'thread_size',label:'Thread Size',type:'select',opts:THREAD_SIZES,def:'M4'},
+    {id:'length_mm',label:'Length (mm)',type:'number',def:'16',min:1,max:500,step:1},
+    {id:'pitch_mm',label:'Pitch (mm)',type:'number',def:'0.70',step:0.05,hint:'Auto-filled from size'},
+    {id:'head_type',label:'Head Type',type:'select',opts:['Socket Cap','Button','Pan','Countersunk','Hex','Flange Hex','Truss','Set Screw'],def:'Socket Cap'},
+    {id:'drive',label:'Drive',type:'select',opts:['Hex (Allen)','Torx','Phillips','Slotted','Pozidriv','Square','None'],def:'Hex (Allen)'},
+    {id:'material',label:'Material',type:'select',opts:MATERIALS,def:'A2-304 Stainless'},
+    {id:'grade',label:'Grade / Class',type:'select',opts:['A2-70','A4-80','A2-50','8.8','10.9','12.9','4.8','5.8'],def:'A2-70'},
+    {id:'standard',label:'Standard',type:'select',opts:['ISO 4762','DIN 912','ISO 7380','DIN 7380','ISO 10642','DIN 933','ISO 4014','ISO 1207'],def:'ISO 4762'},
+    {id:'finish',label:'Finish',type:'select',opts:['Plain','Zinc Plated','Black Oxide','Nickel Plated','Hot Dip Galv','Anodized'],def:'Plain'},
+  ]},
+  nut:{label:'Nut',icon:'🔧',fields:[
+    {id:'thread_size',label:'Thread Size',type:'select',opts:THREAD_SIZES,def:'M4'},
+    {id:'nut_type',label:'Nut Type',type:'select',opts:['Hex','Hex Thin/Jam','Nyloc','Flanged','Flanged Nyloc','Castle','Wing','Cap/Dome','T-nut'],def:'Hex'},
+    {id:'height_mm',label:'Height (mm)',type:'number',def:'3.2',step:0.1,hint:'Auto-filled'},
+    {id:'af_mm',label:'Across Flats (mm)',type:'number',def:'7.0',step:0.1,hint:'Auto-filled'},
+    {id:'material',label:'Material',type:'select',opts:MATERIALS,def:'A2-304 Stainless'},
+    {id:'grade',label:'Grade',type:'select',opts:['A2-70','A4-80','A2-50','5','6','8','10'],def:'A2-70'},
+    {id:'standard',label:'Standard',type:'select',opts:['ISO 4032','DIN 934','ISO 4035','ISO 7042','ISO 10511'],def:'ISO 4032'},
+  ]},
+  washer:{label:'Washer',icon:'⭕',fields:[
+    {id:'fits_size',label:'Fits Bolt Size',type:'select',opts:THREAD_SIZES,def:'M4'},
+    {id:'washer_type',label:'Washer Type',type:'select',opts:['Plain (Form A)','Plain (Form B/Large)','Split Lock','Star Lock (Int)','Star Lock (Ext)','Fender','Spring','Belleville','Nord-Lock'],def:'Plain (Form A)'},
+    {id:'id_mm',label:'Inner Dia (mm)',type:'number',def:'4.3',step:0.1,hint:'Auto-filled'},
+    {id:'od_mm',label:'Outer Dia (mm)',type:'number',def:'9.0',step:0.1,hint:'Auto-filled'},
+    {id:'thickness_mm',label:'Thickness (mm)',type:'number',def:'0.8',step:0.05,hint:'Auto-filled'},
+    {id:'material',label:'Material',type:'select',opts:MATERIALS.slice(0,-1),def:'A2-304 Stainless'},
+    {id:'standard',label:'Standard',type:'select',opts:['ISO 7089','ISO 7090','DIN 125','ISO 7093','DIN 9021'],def:'ISO 7089'},
+  ]},
+  standoff:{label:'Standoff',icon:'📏',fields:[
+    {id:'thread_size',label:'Thread Size',type:'select',opts:['M2','M2.5','M3','M4','M5','M6','M8'],def:'M3'},
+    {id:'length_mm',label:'Length (mm)',type:'number',def:'10',min:1,max:200,step:1},
+    {id:'standoff_type',label:'Type',type:'select',opts:['Hex F-F','Hex M-F','Hex M-M','Round F-F','PCB'],def:'Hex F-F'},
+    {id:'body_shape',label:'Body Shape',type:'select',opts:['Hex','Round'],def:'Hex'},
+    {id:'material',label:'Material',type:'select',opts:['Brass','Aluminum','A2-304 Stainless','Carbon Steel','Nylon'],def:'Brass'},
+  ]},
+  rivet:{label:'Rivet',icon:'🔘',fields:[
+    {id:'rivet_type',label:'Type',type:'select',opts:['Blind/Pop','Solid','Drive','Tubular'],def:'Blind/Pop'},
+    {id:'diameter_mm',label:'Diameter (mm)',type:'select',opts:['2.4','3.2','4.0','4.8','5.0','6.4'],def:'3.2'},
+    {id:'grip_min',label:'Grip Min (mm)',type:'number',def:'',step:0.5},
+    {id:'grip_max',label:'Grip Max (mm)',type:'number',def:'',step:0.5},
+    {id:'head_type',label:'Head Type',type:'select',opts:['Dome','Countersunk','Large Flange','Truss'],def:'Dome'},
+    {id:'body_material',label:'Material',type:'select',opts:['Aluminum','Carbon Steel','A2-304 Stainless','Copper','Monel'],def:'Aluminum'},
+  ]},
+  pin:{label:'Dowel Pin',icon:'📌',fields:[
+    {id:'diameter_mm',label:'Diameter (mm)',type:'select',opts:['2','3','4','5','6','8','10','12'],def:'4'},
+    {id:'length_mm',label:'Length (mm)',type:'number',def:'20',min:1,max:300,step:1},
+    {id:'pin_type',label:'Pin Type',type:'select',opts:['Solid Cylindrical','Roll Pin (Spring)','Slotted'],def:'Solid Cylindrical'},
+    {id:'tolerance',label:'Tolerance',type:'select',opts:['h6 (drive fit)','m6 (press fit)','g6 (slip fit)','f7 (running fit)'],def:'h6 (drive fit)'},
+    {id:'material',label:'Material',type:'select',opts:['Carbon Steel','A2-304 Stainless','Hardened Steel','Brass'],def:'Carbon Steel'},
+  ]},
+  circlip:{label:'Circlip',icon:'🔁',fields:[
+    {id:'shaft_diameter_mm',label:'Shaft / Bore Dia (mm)',type:'number',def:'10',min:1,max:300,step:0.5},
+    {id:'circlip_type',label:'Type',type:'select',opts:['External','Internal'],def:'External'},
+    {id:'material',label:'Material',type:'select',opts:['Carbon Steel','A2-304 Stainless','Phosphor Bronze'],def:'Carbon Steel'},
+  ]},
+  insert:{label:'Insert',icon:'🪛',fields:[
+    {id:'thread_size',label:'Thread Size',type:'select',opts:['M2','M2.5','M3','M4','M5','M6','M8','M10','M12'],def:'M4'},
+    {id:'length_mm',label:'Length (mm)',type:'number',def:'6',min:1,max:50,step:1},
+    {id:'install_method',label:'Installation',type:'select',opts:['Heat-Set (Brass)','Threaded','Self-Tapping'],def:'Heat-Set (Brass)'},
+    {id:'material',label:'Material',type:'select',opts:['Brass','A2-304 Stainless','Carbon Steel'],def:'Brass'},
+  ]},
+};
+
+let _hwCurrentType='screw';
+let _hwLabelB64=null;
+let _hwLabelsInited=false;
+
+function initLabelsPage(){
+  if(_hwLabelsInited)return;
+  _hwLabelsInited=true;
+  // Build type grid
+  const grid=document.getElementById('hwTypeGrid');
+  Object.entries(HW_TYPES).forEach(([key,def])=>{
+    const btn=document.createElement('button');
+    btn.className='hw-type-btn';
+    btn.id='hw-type-'+key;
+    btn.innerHTML=`<span class="hw-icon">${def.icon}</span><span>${def.label}</span>`;
+    btn.onclick=()=>hwSelectType(key);
+    grid.appendChild(btn);
+  });
+  // Restore saved printer
+  const saved=localStorage.getItem('hw_label_printer');
+  if(saved)document.getElementById('hwPrinterAddr').value=saved;
+  // Select default type
+  hwSelectType('screw');
+}
+
+function hwSelectType(type){
+  _hwCurrentType=type;
+  document.querySelectorAll('.hw-type-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('hw-type-'+type);
+  if(btn)btn.classList.add('active');
+  hwBuildSpecForm(type);
+  document.getElementById('hwSpecCard').style.display='';
+  document.getElementById('hwSpecBadge').textContent=HW_TYPES[type].label;
+  document.getElementById('hwSpecTitle').textContent='Specifications';
+}
+
+function hwBuildSpecForm(type){
+  const container=document.getElementById('hwSpecForm');
+  container.innerHTML='';
+  const def=HW_TYPES[type];
+  if(!def)return;
+  // Render in a 2-col grid
+  const grid=document.createElement('div');
+  grid.className='grid-2';
+  grid.style.gap='12px';
+  def.fields.forEach(f=>{
+    const wrap=document.createElement('div');
+    wrap.className='field';
+    const lbl=document.createElement('label');
+    lbl.textContent=f.label+(f.unit?' ('+f.unit+')':'');
+    wrap.appendChild(lbl);
+    let inp;
+    if(f.type==='select'){
+      inp=document.createElement('select');
+      inp.id='hwf_'+f.id;
+      f.opts.forEach(o=>{
+        const opt=document.createElement('option');
+        opt.value=o;opt.textContent=o;
+        if(o===f.def)opt.selected=true;
+        inp.appendChild(opt);
+      });
+    }else{
+      inp=document.createElement('input');
+      inp.type='number';
+      inp.id='hwf_'+f.id;
+      inp.placeholder=f.label;
+      if(f.def!==undefined&&f.def!=='')inp.value=f.def;
+      if(f.min!==undefined)inp.min=f.min;
+      if(f.max!==undefined)inp.max=f.max;
+      if(f.step!==undefined)inp.step=f.step;
+    }
+    wrap.appendChild(inp);
+    if(f.hint){
+      const hint=document.createElement('div');
+      hint.className='field-hint';
+      hint.textContent=f.hint;
+      wrap.appendChild(hint);
+    }
+    grid.appendChild(wrap);
+  });
+  container.appendChild(grid);
+  // Auto-fill hook for metric sizes
+  const sizeEl=document.getElementById('hwf_thread_size')||document.getElementById('hwf_fits_size');
+  if(sizeEl){
+    sizeEl.addEventListener('change',()=>hwAutoFill(type,sizeEl.value));
+    hwAutoFill(type,sizeEl.value);
+  }
+}
+
+function hwAutoFill(type,size){
+  const d=METRIC_DIMS[size];if(!d)return;
+  if(type==='screw'){
+    const p=document.getElementById('hwf_pitch_mm');if(p)p.value=d.pitch;
+  }else if(type==='nut'){
+    const h=document.getElementById('hwf_height_mm');if(h)h.value=d.nut_h;
+    const af=document.getElementById('hwf_af_mm');if(af)af.value=d.af;
+  }else if(type==='washer'){
+    const id_=document.getElementById('hwf_id_mm');if(id_)id_.value=d.w_id;
+    const od=document.getElementById('hwf_od_mm');if(od)od.value=d.w_od;
+    const t=document.getElementById('hwf_thickness_mm');if(t)t.value=d.w_t;
+  }
+}
+
+function hwCollectSpecs(){
+  const specs={};
+  const def=HW_TYPES[_hwCurrentType];
+  if(!def)return specs;
+  def.fields.forEach(f=>{
+    const el=document.getElementById('hwf_'+f.id);
+    if(el)specs[f.id]=el.value;
+  });
+  return specs;
+}
+
+function hwCollectOptions(){
+  return{
+    show_diagram:document.getElementById('hwOptDiagram').checked,
+    show_topview:document.getElementById('hwOptTopview').checked,
+    show_sideview:document.getElementById('hwOptSideview').checked,
+    show_material:document.getElementById('hwOptMaterial').checked,
+    show_standard:document.getElementById('hwOptStandard').checked,
+    show_grade:document.getElementById('hwOptGrade').checked,
+  };
+}
+
+async function hwPreviewLabel(){
+  const st=document.getElementById('hwLabelStatus');
+  setStatus(st,'Generating…','loading');
+  try{
+    const payload={
+      type:_hwCurrentType,
+      specs:hwCollectSpecs(),
+      label_length_mm:parseFloat(document.getElementById('hwLabelLength').value)||36,
+      options:hwCollectOptions(),
+    };
+    const res=await apiPOST('/api/labels/hardware/generate',payload);
+    _hwLabelB64=res.image;
+    // Full label preview (3× zoom)
+    const wrap=document.getElementById('hwLabelPreviewWrap');
+    wrap.innerHTML='';
+    const img=document.createElement('img');
+    img.src='data:image/png;base64,'+res.image;
+    img.style.width=(res.width*3)+'px';
+    img.style.height=(res.height*3)+'px';
+    img.style.imageRendering='pixelated';
+    img.alt='Label preview';
+    wrap.appendChild(img);
+    // Standalone views
+    const views=document.getElementById('hwViews');
+    if(res.topview||res.sideview){
+      views.style.display='';
+      if(res.topview){
+        document.getElementById('hwTopviewImg').src='data:image/png;base64,'+res.topview;
+      }
+      if(res.sideview){
+        document.getElementById('hwSideviewImg').src='data:image/png;base64,'+res.sideview;
+      }
+    }else{
+      views.style.display='none';
+    }
+    document.getElementById('hwDownloadBtn').style.display='';
+    setStatus(st,`Label ${res.width}×${res.height}px ready`,'ok');
+  }catch(e){
+    setStatus(st,'❌ '+e.message,'err');
+  }
+}
+
+async function hwPrintLabel(){
+  const addr=document.getElementById('hwPrinterAddr').value.trim();
+  if(!addr){setStatus(document.getElementById('hwLabelStatus'),'Enter printer address first','err');return;}
+  const st=document.getElementById('hwLabelStatus');
+  setStatus(st,'Printing…','loading');
+  localStorage.setItem('hw_label_printer',addr);
+  try{
+    const payload={
+      type:_hwCurrentType,
+      specs:hwCollectSpecs(),
+      label_length_mm:parseFloat(document.getElementById('hwLabelLength').value)||36,
+      options:hwCollectOptions(),
+      printer:addr,
+      copies:parseInt(document.getElementById('hwCopies').value)||1,
+    };
+    await apiPOST('/api/labels/hardware/print',payload);
+    setStatus(st,'✅ Sent to printer','ok');
+  }catch(e){
+    setStatus(st,'❌ '+e.message,'err');
+  }
+}
+
+async function hwTestPrinter(){
+  const addr=document.getElementById('hwPrinterAddr').value.trim();
+  if(!addr){setStatus(document.getElementById('hwPrinterStatus'),'Enter an address first','err');return;}
+  setStatus(document.getElementById('hwPrinterStatus'),'Testing…','loading');
+  try{
+    const res=await apiGET('/api/labels/hardware/printer-test?printer='+encodeURIComponent(addr));
+    setStatus(document.getElementById('hwPrinterStatus'),'✅ OK — '+res.printer,'ok');
+  }catch(e){
+    setStatus(document.getElementById('hwPrinterStatus'),'❌ '+e.message,'err');
+  }
+}
+
+function hwDownloadLabel(){
+  if(!_hwLabelB64)return;
+  const a=document.createElement('a');
+  a.href='data:image/png;base64,'+_hwLabelB64;
+  const type=_hwCurrentType;
+  const specs=hwCollectSpecs();
+  const sz=specs.thread_size||specs.fits_size||specs.diameter_mm||specs.shaft_diameter_mm||'';
+  a.download=`label_${type}_${sz}.png`.replace(/\s+/g,'_');
+  a.click();
+}
 </script>
 <script>
 if ('serviceWorker' in navigator) {
