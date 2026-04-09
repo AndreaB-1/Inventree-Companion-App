@@ -1567,6 +1567,10 @@ def hw_label_print(payload: dict):
             printer = f'tcp://{printer}'
         backend = 'network' if printer.startswith('tcp://') else 'pyusb'
         img = _make_hw_label(hw_type, specs, length, opts)
+        # brother_ql expects portrait orientation: width = tape width (106px),
+        # height = label length. Our image is landscape (length × 106h), so
+        # rotate 90° clockwise to produce the correct 106w × length_h portrait.
+        img = img.rotate(-90, expand=True)
         qlr = BrotherQLRaster('QL-710W')
         qlr.exception_on_warning = True
         instr = convert(
