@@ -34,6 +34,8 @@ import mimetypes
 import requests
 from urllib.parse import urljoin
 from fastapi.responses import StreamingResponse
+import base64
+import math
 
 
 
@@ -1022,3 +1024,557 @@ def print_labels(payload: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== HARDWARE LABEL GENERATION ====================
+
+LABEL_HEIGHT_PX = 106   # 12mm DK-2210 printable width on QL-710W at 300 dpi
+LABEL_DPI = 300
+
+
+def _hw_font(size: int = 10):
+    """Return a PIL font, falling back to the built-in bitmap font."""
+    for path in [
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+        '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
+        '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf',
+    ]:
+        if os.path.exists(path):
+            try:
+                from PIL import ImageFont as _IF
+                return _IF.truetype(path, size)
+            except Exception:
+                pass
+    from PIL import ImageFont as _IF
+    try:
+        return _IF.load_default(size=size)
+    except TypeError:
+        return _IF.load_default()
+
+
+def _hex_pts(cx, cy, r):
+    return [(cx + r * math.cos(math.radians(30 + 60 * i)),
+             cy + r * math.sin(math.radians(30 + 60 * i))) for i in range(6)]
+
+
+# ── top-view renderers ─────────────────────────────────────────────
+
+def _tv_screw(d, specs, x, y, w, h):
+    head  = specs.get('head_type', 'Socket Cap')
+    drive = specs.get('drive', 'Hex (Allen)')
+    cx, cy = x + w // 2, y + h // 2
+    r  = max(4, min(w, h) // 2 - 2)
+    if head == 'Hex':
+        d.polygon(_hex_pts(cx, cy, r), outline=0)
+    else:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    dr = max(2, int(r * 0.5))
+    if drive == 'Hex (Allen)':
+        d.polygon(_hex_pts(cx, cy, dr), fill=0)
+    elif drive == 'Slotted':
+        t = max(1, dr // 3)
+        d.rectangle([cx - dr, cy - t, cx + dr, cy + t], fill=0)
+    elif drive in ('Phillips', 'Pozidriv'):
+        t = max(1, dr // 3)
+        d.rectangle([cx - dr, cy - t, cx + dr, cy + t], fill=0)
+        d.rectangle([cx - t, cy - dr, cx + t, cy + dr], fill=0)
+    elif drive == 'Torx':
+        for ang in [0, 60, 120]:
+            dx = dr * math.cos(math.radians(ang))
+            dy = dr * math.sin(math.radians(ang))
+            d.line([(cx - dx, cy - dy), (cx + dx, cy + dy)], fill=0, width=max(2, dr // 3))
+    elif drive == 'Square':
+        sq = max(2, dr // 2)
+        d.rectangle([cx - sq, cy - sq, cx + sq, cy + sq], fill=0)
+
+
+def _tv_nut(d, specs, x, y, w, h):
+    cx, cy = x + w // 2, y + h // 2
+    r = max(4, min(w, h) // 2 - 2)
+    d.polygon(_hex_pts(cx, cy, r), outline=0)
+    hr = max(2, int(r * 0.45))
+    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=1)
+
+
+def _tv_washer(d, specs, x, y, w, h):
+    cx, cy = x + w // 2, y + h // 2
+    ro = max(5, min(w, h) // 2 - 2)
+    ri = max(2, int(ro * 0.4))
+    d.ellipse([cx - ro, cy - ro, cx + ro, cy + ro], outline=0, width=1)
+    d.ellipse([cx - ri, cy - ri, cx + ri, cy + ri], outline=0, width=1)
+
+
+def _tv_standoff(d, specs, x, y, w, h):
+    cx, cy = x + w // 2, y + h // 2
+    r = max(4, min(w, h) // 2 - 2)
+    if specs.get('body_shape', 'Hex') == 'Hex':
+        d.polygon(_hex_pts(cx, cy, r), outline=0)
+    else:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    hr = max(2, int(r * 0.35))
+    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=1)
+
+
+def _tv_rivet(d, specs, x, y, w, h):
+    cx, cy = x + w // 2, y + h // 2
+    r = max(4, min(w, h) // 2 - 2)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    if specs.get('rivet_type', '') == 'Blind/Pop':
+        mr = max(1, r // 3)
+        d.ellipse([cx - mr, cy - mr, cx + mr, cy + mr], fill=0)
+
+
+def _tv_pin(d, specs, x, y, w, h):
+    cx, cy = x + w // 2, y + h // 2
+    r = max(3, min(w, h) // 2 - 3)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    if specs.get('pin_type', '') in ('Roll Pin (Spring)', 'Slotted'):
+        d.line([(cx - r, cy), (cx + r, cy)], fill=0, width=1)
+
+
+def _tv_circlip(d, specs, x, y, w, h):
+    cx, cy = x + w // 2, y + h // 2
+    ro = max(5, min(w, h) // 2 - 2)
+    ri = max(3, int(ro * 0.65))
+    gap = 55
+    start, end = gap // 2, 360 - gap // 2
+    for a in range(start, end, 5):
+        a1 = math.radians(a)
+        a2 = math.radians(min(a + 5, end))
+        for ri_ in [ri, ro]:
+            d.line([(cx + ri_ * math.cos(a1), cy + ri_ * math.sin(a1)),
+                    (cx + ri_ * math.cos(a2), cy + ri_ * math.sin(a2))], fill=0, width=1)
+    rm = (ri + ro) // 2
+    for a in range(start, end, 3):
+        a1 = math.radians(a + 1.5)
+        d.point((cx + rm * math.cos(a1), cy + rm * math.sin(a1)), fill=0)
+    for ta in [math.radians(start - 5), math.radians(end + 5)]:
+        tx_, ty_ = cx + ro * math.cos(ta), cy + ro * math.sin(ta)
+        d.ellipse([tx_ - 2, ty_ - 2, tx_ + 2, ty_ + 2], fill=0)
+
+
+def _tv_insert(d, specs, x, y, w, h):
+    cx, cy = x + w // 2, y + h // 2
+    r = max(4, min(w, h) // 2 - 2)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    hr = max(2, int(r * 0.35))
+    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=1)
+    for i in range(3):
+        a = math.radians(i * 60)
+        lx  = cx + (r - 1) * math.cos(a)
+        ly_ = cy + (r - 1) * math.sin(a)
+        lx2 = cx + (r + 3) * math.cos(a + math.radians(15))
+        ly2 = cy + (r + 3) * math.sin(a + math.radians(15))
+        d.line([(lx, ly_), (lx2, ly2)], fill=0, width=1)
+
+
+# ── side-view renderers ────────────────────────────────────────────
+
+def _sv_screw(d, specs, x, y, w, h):
+    head = specs.get('head_type', 'Socket Cap')
+    cx = x + w // 2
+    hh = max(5, int(h * 0.26))
+    sw = max(4, int(w * 0.30))
+    hw = min(int(sw * 2.1), w - 4)
+    sh = h - hh - 2
+    sx1, sx2 = cx - sw // 2, cx + sw // 2
+    hx1, hx2 = cx - hw // 2, cx + hw // 2
+    if head == 'Countersunk':
+        d.polygon([(hx1, y), (hx2, y), (sx2, y + hh), (sx1, y + hh)], outline=0)
+    elif head == 'Set Screw':
+        hh = 0; sh = h - 2
+    elif head == 'Button':
+        dome = hh * 2
+        d.pieslice([hx1, y - dome // 2, hx2, y + dome // 2], 180, 360, fill=0, outline=0)
+    elif head == 'Flange Hex':
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=1)
+        d.rectangle([hx1 - 2, y + hh, hx2 + 2, y + hh + 2], fill=0)
+    else:
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=1)
+    d.rectangle([sx1, y + hh, sx2, y + hh + sh], outline=0, width=1)
+    nt = max(3, sh // 5)
+    step = sh / nt
+    for i in range(nt):
+        ty = y + hh + i * step
+        d.line([(sx1, ty), (sx2, ty + step * 0.7)], fill=0, width=1)
+
+
+def _sv_nut(d, specs, x, y, w, h):
+    cx = x + w // 2
+    nut_h = max(6, int(h * 0.60))
+    ny = y + (h - nut_h) // 2
+    af = min(w - 4, int(min(w, h) // 2 * 1.8))
+    nx = cx - af // 2
+    c = max(1, nut_h // 5)
+    hr = max(2, int(af * 0.22))
+    d.polygon([
+        (nx + c, ny), (nx + af - c, ny), (nx + af, ny + c),
+        (nx + af, ny + nut_h - c), (nx + af - c, ny + nut_h),
+        (nx + c, ny + nut_h), (nx, ny + nut_h - c), (nx, ny + c),
+    ], outline=0)
+    d.rectangle([cx - hr, ny, cx + hr, ny + nut_h], fill='white')
+    d.line([(cx - hr, ny), (cx - hr, ny + nut_h)], fill=0, width=1)
+    d.line([(cx + hr, ny), (cx + hr, ny + nut_h)], fill=0, width=1)
+
+
+def _sv_washer(d, specs, x, y, w, h):
+    cx = x + w // 2
+    ro = max(5, min(w, h) // 2 - 2)
+    ri = max(2, int(ro * 0.4))
+    t = max(2, int(h * 0.35))
+    sy = y + (h - t) // 2
+    lx = cx - ro
+    gap = ro - ri
+    d.rectangle([lx, sy, lx + gap, sy + t], outline=0, width=1)
+    d.rectangle([lx + gap + ri * 2, sy, lx + ro * 2, sy + t], outline=0, width=1)
+
+
+def _sv_standoff(d, specs, x, y, w, h):
+    cx = x + w // 2
+    r = max(4, min(w, h) // 2 - 2)
+    bh = int(h * 0.75)
+    by = y + (h - bh) // 2
+    hr = max(2, int(r * 0.35))
+    st = specs.get('standoff_type', 'Hex F-F')
+    d.rectangle([cx - r, by, cx + r, by + bh], outline=0, width=1)
+    d.line([(cx - hr, by), (cx - hr, by + bh)], fill=0, width=1)
+    d.line([(cx + hr, by), (cx + hr, by + bh)], fill=0, width=1)
+    tl = max(4, bh // 5)
+    sw2 = max(3, hr * 2)
+    if 'M-F' in st:
+        d.rectangle([cx - sw2 // 2, by - tl, cx + sw2 // 2, by], outline=0, width=1)
+        d.line([(cx - sw2 // 2, by - tl + 1), (cx + sw2 // 2, by - 1)], fill=0, width=1)
+    if 'M-M' in st:
+        d.rectangle([cx - sw2 // 2, by + bh, cx + sw2 // 2, by + bh + tl], outline=0, width=1)
+        d.line([(cx - sw2 // 2, by + bh + 1), (cx + sw2 // 2, by + bh + tl - 1)], fill=0, width=1)
+
+
+def _sv_rivet(d, specs, x, y, w, h):
+    cx = x + w // 2
+    rt = specs.get('rivet_type', 'Blind/Pop')
+    ht = specs.get('head_type', 'Dome')
+    hh = max(5, int(h * 0.28))
+    rw = max(4, min(w, h) - 8)
+    hw = min(int(rw * 1.8), w - 4)
+    sh = h - hh - 2
+    hx1, hx2 = cx - hw // 2, cx + hw // 2
+    sx1, sx2 = cx - rw // 2, cx + rw // 2
+    if ht == 'Dome':
+        d.pieslice([hx1, y - hh, hx2, y + hh], 180, 360, fill=0, outline=0)
+    elif ht in ('Countersunk', 'Flat'):
+        d.polygon([(hx1, y + hh), (hx2, y + hh), (sx2, y), (sx1, y)], outline=0)
+    else:
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=1)
+    d.rectangle([sx1, y + hh, sx2, y + hh + sh], outline=0, width=1)
+    if rt == 'Blind/Pop':
+        mr = max(1, rw // 4)
+        d.rectangle([cx - mr, y, cx + mr, y + hh + sh + 3], fill=0)
+
+
+def _sv_pin(d, specs, x, y, w, h):
+    cx = x + w // 2
+    r = max(3, min(w, h) // 2 - 3)
+    d.rectangle([cx - r, y + 2, cx + r, y + h - 2], outline=0, width=1)
+    if specs.get('pin_type', '') in ('Roll Pin (Spring)', 'Slotted'):
+        d.line([(cx, y + 2), (cx, y + h - 2)], fill=0, width=1)
+
+
+def _sv_circlip(d, specs, x, y, w, h):
+    cx = x + w // 2
+    ro = max(5, min(w, h) // 2 - 2)
+    t = max(2, int(h * 0.30))
+    sy = y + (h - t) // 2
+    gp = max(3, int(ro * 0.25))
+    gx = cx - gp // 2
+    d.rectangle([cx - ro, sy, cx + ro, sy + t], outline=0, width=1)
+    d.rectangle([gx, sy - 1, gx + gp, sy + t + 1], fill='white')
+    d.line([(gx, sy), (gx, sy + t)], fill=0, width=1)
+    d.line([(gx + gp, sy), (gx + gp, sy + t)], fill=0, width=1)
+
+
+def _sv_insert(d, specs, x, y, w, h):
+    cx = x + w // 2
+    r = max(4, min(w, h) // 2 - 2)
+    bh = int(h * 0.70)
+    by = y + (h - bh) // 2
+    hr = max(2, int(r * 0.35))
+    d.rectangle([cx - r, by, cx + r, by + bh], outline=0, width=1)
+    d.line([(cx - hr, by), (cx - hr, by + bh)], fill=0, width=1)
+    d.line([(cx + hr, by), (cx + hr, by + bh)], fill=0, width=1)
+    for i in range(1, 4):
+        ky = by + bh * i // 4
+        d.line([(cx - r, ky), (cx - r - 2, ky + 2)], fill=0, width=1)
+        d.line([(cx + r, ky), (cx + r + 2, ky + 2)], fill=0, width=1)
+
+
+_HW_TV = {
+    'screw': _tv_screw, 'nut': _tv_nut, 'washer': _tv_washer,
+    'standoff': _tv_standoff, 'rivet': _tv_rivet, 'pin': _tv_pin,
+    'circlip': _tv_circlip, 'insert': _tv_insert,
+}
+_HW_SV = {
+    'screw': _sv_screw, 'nut': _sv_nut, 'washer': _sv_washer,
+    'standoff': _sv_standoff, 'rivet': _sv_rivet, 'pin': _sv_pin,
+    'circlip': _sv_circlip, 'insert': _sv_insert,
+}
+
+
+def _draw_hw_diagram(d, hw_type, specs, x, y, w, h, tv=True, sv=True):
+    tfn = _HW_TV.get(hw_type)
+    sfn = _HW_SV.get(hw_type)
+    if tv and sv:
+        half = h // 2
+        if tfn: tfn(d, specs, x, y + 1, w, half - 2)
+        if sfn: sfn(d, specs, x, y + half + 1, w, half - 2)
+        d.line([(x + 2, y + half), (x + w - 2, y + half)], fill=180, width=1)
+        try:
+            f7 = _hw_font(7)
+            d.text((x + 1, y + 1), 'T', fill=160, font=f7)
+            d.text((x + 1, y + half + 1), 'S', fill=160, font=f7)
+        except Exception:
+            pass
+    elif tv and tfn:
+        tfn(d, specs, x, y, w, h)
+    elif sv and sfn:
+        sfn(d, specs, x, y, w, h)
+
+
+def _mat_ab(m: str) -> str:
+    return {
+        'A2-304 Stainless': 'A2', 'A4-316 Stainless': 'A4',
+        'Carbon Steel': 'CS', 'Alloy Steel': 'AS',
+        'Zinc Plated': 'ZnP', 'Black Oxide': 'BLK',
+        'Brass': 'Brass', 'Nylon': 'Nylon', 'Titanium': 'Ti',
+    }.get(m, m[:4] if m else '')
+
+
+def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
+    sm = opts.get('show_material', True)
+    ss = opts.get('show_standard', True)
+    sg = opts.get('show_grade', True)
+    lines: list = []
+
+    def mat_line():
+        m = specs.get('material', '') or specs.get('body_material', '')
+        g = specs.get('grade', '')
+        if sm and m:
+            lines.append(_mat_ab(m) + (' ' + g if sg and g else ''))
+
+    if hw_type == 'screw':
+        sz, ln = specs.get('thread_size', ''), specs.get('length_mm', '')
+        head, drive = specs.get('head_type', ''), specs.get('drive', '')
+        ha = {'Socket Cap': 'SHC', 'Button': 'BHC', 'Pan': 'PH', 'Countersunk': 'CSK',
+              'Hex': 'HEX', 'Flange Hex': 'FHEX', 'Truss': 'TRU', 'Set Screw': 'SS',
+              }.get(head, head[:3].upper() if head else '')
+        lines.append(f"{sz}{'×' + str(ln) if ln else ''}")
+        ts = ha + (' ' + drive[:3].upper() if drive and drive != 'None' else '') if ha else ''
+        if ts: lines.append(ts)
+        mat_line()
+        if ss and specs.get('standard'): lines.append(specs['standard'])
+
+    elif hw_type == 'nut':
+        na = {'Hex': 'HEX', 'Hex Thin/Jam': 'JAM', 'Nyloc': 'NYL', 'Flanged': 'FLG',
+              'Flanged Nyloc': 'FNL', 'Castle': 'CAS', 'Wing': 'WNG',
+              'Cap/Dome': 'CAP', 'T-nut': 'T-NUT'}.get(specs.get('nut_type', ''))
+        lines.append(specs.get('thread_size', ''))
+        if na: lines.append(f"{na} NUT")
+        mat_line()
+        if ss and specs.get('standard'): lines.append(specs['standard'])
+
+    elif hw_type == 'washer':
+        wa = {'Plain (Form A)': 'FLAT', 'Plain (Form B/Large)': 'FLAT-L',
+              'Split Lock': 'LOCK', 'Star Lock (Int)': 'STR-I',
+              'Star Lock (Ext)': 'STR-E', 'Fender': 'FEND',
+              'Spring': 'SPR', 'Belleville': 'BELL', 'Nord-Lock': 'NL',
+              }.get(specs.get('washer_type', ''))
+        lines.append(specs.get('fits_size', ''))
+        if wa: lines.append(f"{wa} WSH")
+        mat_line()
+        if ss and specs.get('standard'): lines.append(specs['standard'])
+
+    elif hw_type == 'standoff':
+        sz, ln = specs.get('thread_size', ''), specs.get('length_mm', '')
+        sa = {'Hex F-F': 'HFF', 'Hex M-F': 'HMF', 'Hex M-M': 'HMM',
+              'Round F-F': 'RFF', 'PCB': 'PCB'}.get(specs.get('standoff_type', ''))
+        lines.append(f"{sz}{' ' + str(ln) + 'mm' if ln else ''}")
+        if sa: lines.append(f"{sa} STNDF")
+        mat_line()
+
+    elif hw_type == 'rivet':
+        dia = specs.get('diameter_mm', '')
+        ra = {'Blind/Pop': 'POP', 'Solid': 'SOLID', 'Drive': 'DRV',
+              'Tubular': 'TUB'}.get(specs.get('rivet_type', ''))
+        gn, gx_ = specs.get('grip_min', ''), specs.get('grip_max', '')
+        lines.append(f"\u00d8{dia}mm" if dia else '')
+        if ra: lines.append(f"{ra} RIVET")
+        if gn or gx_: lines.append(f"grip {gn}-{gx_}mm")
+        mat_line()
+
+    elif hw_type == 'pin':
+        dia, ln = specs.get('diameter_mm', ''), specs.get('length_mm', '')
+        pa = {'Solid Cylindrical': 'DWLP', 'Roll Pin (Spring)': 'ROLL',
+              'Slotted': 'SLOT'}.get(specs.get('pin_type', ''))
+        tol = specs.get('tolerance', '')
+        lines.append(f"\u00d8{dia}\u00d7{ln}mm" if dia and ln else f"\u00d8{dia}mm" if dia else '')
+        if pa: lines.append(f"{pa} PIN")
+        if tol: lines.append(tol.split(' ')[0])
+        mat_line()
+
+    elif hw_type == 'circlip':
+        dia = specs.get('shaft_diameter_mm', '')
+        ca = {'External': 'EXT', 'Internal': 'INT'}.get(specs.get('circlip_type', ''))
+        lines.append(f"\u00d8{dia}mm" if dia else '')
+        if ca: lines.append(f"{ca} CIRCLIP")
+        mat_line()
+
+    elif hw_type == 'insert':
+        sz, ln = specs.get('thread_size', ''), specs.get('length_mm', '')
+        ia = {'Heat-Set (Brass)': 'HEAT', 'Threaded': 'THRD',
+              'Self-Tapping': 'ST'}.get(specs.get('install_method', ''))
+        lines.append(f"{sz}{' ' + str(ln) + 'mm' if ln else ''}")
+        if ia: lines.append(f"{ia} INSERT")
+        mat_line()
+
+    else:
+        lines.append(hw_type.upper())
+
+    return [l.strip() for l in lines if l and l.strip()]
+
+
+def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> Image.Image:
+    from PIL import ImageDraw as _ID
+    w = max(LABEL_HEIGHT_PX, round(length_mm * LABEL_DPI / 25.4))
+    h = LABEL_HEIGHT_PX
+    img = Image.new('RGB', (w, h), 'white')
+    d = _ID.Draw(img)
+
+    tv   = opts.get('show_topview', True)
+    sv_  = opts.get('show_sideview', True)
+    diag = opts.get('show_diagram', True) and (tv or sv_)
+
+    dw = 0
+    if diag:
+        dw = min(90, max(52, w // 4))
+        _draw_hw_diagram(d, hw_type, specs, 2, 2, dw - 4, h - 4, tv, sv_)
+        d.line([(dw, 2), (dw, h - 2)], fill=0, width=1)
+
+    tx, tw = dw + 4, w - dw - 8
+    lines = _label_lines(hw_type, specs, opts)
+    if lines and tw > 10:
+        yp = 5
+        f_big = _hw_font(22)
+        for sz in [22, 18, 14, 11]:
+            f = _hw_font(sz)
+            try:
+                bb = d.textbbox((tx, yp), lines[0], font=f)
+                if bb[2] - bb[0] <= tw:
+                    f_big = f
+                    break
+            except Exception:
+                f_big = f
+                break
+        d.text((tx, yp), lines[0], fill=0, font=f_big)
+        try:
+            yp = d.textbbox((tx, yp), lines[0], font=f_big)[3] + 3
+        except Exception:
+            yp += 25
+        fs = _hw_font(11)
+        for line in lines[1:]:
+            if yp + 12 > h - 2:
+                break
+            d.text((tx, yp), line, fill=0, font=fs)
+            try:
+                yp = d.textbbox((tx, yp), line, font=fs)[3] + 2
+            except Exception:
+                yp += 13
+    return img
+
+
+def _img_to_b64(img: Image.Image) -> str:
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def _make_view_img(hw_type: str, specs: dict, size: int = 200, which: str = 'top') -> Image.Image:
+    from PIL import ImageDraw as _ID
+    img = Image.new('RGB', (size, size), 'white')
+    d = _ID.Draw(img)
+    fn = (_HW_TV if which == 'top' else _HW_SV).get(hw_type)
+    if fn:
+        fn(d, specs, 8, 8, size - 16, size - 16)
+    return img
+
+
+# ── Hardware label endpoints ───────────────────────────────────────
+
+@app.get("/api/labels/hardware/printer-test")
+def hw_printer_test(printer: str):
+    """Verify that brother_ql is installed and the printer address parses correctly."""
+    try:
+        from brother_ql.raster import BrotherQLRaster  # noqa: F401
+        addr = printer if printer.startswith(('tcp://', 'usb://')) else f'tcp://{printer}'
+        return {"ok": True, "printer": addr}
+    except ImportError:
+        raise HTTPException(status_code=500, detail="brother_ql not installed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/labels/hardware/generate")
+def hw_label_generate(payload: dict):
+    """Return a hardware label PNG (base64) plus 200×200 top/side view images."""
+    try:
+        hw_type = payload.get("type", "screw")
+        specs   = payload.get("specs", {})
+        length  = float(payload.get("label_length_mm", 36))
+        opts    = payload.get("options", {})
+        img    = _make_hw_label(hw_type, specs, length, opts)
+        tv_img = _make_view_img(hw_type, specs, 200, 'top')
+        sv_img = _make_view_img(hw_type, specs, 200, 'side')
+        return {
+            "image":    _img_to_b64(img),
+            "topview":  _img_to_b64(tv_img),
+            "sideview": _img_to_b64(sv_img),
+            "width":    img.width,
+            "height":   img.height,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/labels/hardware/print")
+def hw_label_print(payload: dict):
+    """Generate a hardware label and send it to a Brother QL-710W printer."""
+    try:
+        from brother_ql.raster import BrotherQLRaster
+        from brother_ql.conversion import convert
+        from brother_ql.backends.helpers import send
+    except ImportError:
+        raise HTTPException(status_code=500, detail="brother_ql not installed")
+    try:
+        hw_type = payload.get("type", "screw")
+        specs   = payload.get("specs", {})
+        length  = float(payload.get("label_length_mm", 36))
+        opts    = payload.get("options", {})
+        printer = payload.get("printer", "")
+        copies  = max(1, int(payload.get("copies", 1)))
+        if not printer:
+            raise HTTPException(status_code=400, detail="printer address required")
+        if not printer.startswith(('tcp://', 'usb://')):
+            printer = f'tcp://{printer}'
+        backend = 'network' if printer.startswith('tcp://') else 'pyusb'
+        img = _make_hw_label(hw_type, specs, length, opts)
+        qlr = BrotherQLRaster('QL-710W')
+        qlr.exception_on_warning = True
+        instr = convert(
+            qlr=qlr, images=[img] * copies, label='12',
+            rotate='0', threshold=70, dither=False,
+            compress=False, red=False, dpi_600=False, hq=True, cut=True,
+        )
+        send(instructions=instr, printer_identifier=printer,
+             backend_identifier=backend, blocking=True)
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
