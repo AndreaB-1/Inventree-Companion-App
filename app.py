@@ -289,6 +289,7 @@ class PartUpdateReq(BaseModel):
     pk: int
     name: Optional[str] = None
     description: Optional[str] = None
+    ipn: Optional[str] = None
 
 @app.post("/api/part/update-meta")
 def update_part_meta(req: PartUpdateReq):
@@ -297,6 +298,8 @@ def update_part_meta(req: PartUpdateReq):
         data["name"] = req.name
     if req.description is not None:
         data["description"] = req.description
+    if req.ipn is not None:
+        data["IPN"] = req.ipn
     if not data:
         return {"ok": True, "message": "Nothing to update"}
     try:

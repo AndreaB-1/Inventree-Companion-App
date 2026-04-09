@@ -365,6 +365,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
         <span class="ni-icon">🧹</span>
         <span class="ni-label">Naming Standards</span>
       </button>
+      <button id="nav-edit" class="nav-item" onclick="showPage('edit')">
+        <span class="ni-icon">✏️</span>
+        <span class="ni-label">Edit Part</span>
+      </button>
 
       <div class="sidebar-footer">
         <div class="server-badge">Server: <code>:8000</code></div>
@@ -635,6 +639,89 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       </div>
     </section>
 
+    <!-- EDIT PART PAGE -->
+    <section id="page-edit" class="page">
+      <div class="page-header">
+        <div class="page-icon">✏️</div>
+        <div class="page-header-text">
+          <h1>Edit Part</h1>
+          <p>Update details and image for an existing part</p>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="card">
+        <div class="card-header"><h2>Find Part</h2></div>
+        <div class="grid-2" style="gap:14px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="field dropdown" id="editSearchWrap">
+              <label>Search by name or IPN</label>
+              <input id="editSearch" placeholder="Start typing…" autocomplete="off">
+              <div id="editSearchList" class="dropdown-list"></div>
+            </div>
+            <div class="field">
+              <label>Selected Part</label>
+              <input id="editPartLabel" readonly placeholder="None selected">
+              <input type="hidden" id="editPartId">
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center">
+            <img id="editThumb" class="part-thumb" alt="Part image" style="width:130px;height:130px;cursor:zoom-in">
+          </div>
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div class="card" id="editDetailsCard" style="display:none">
+        <div class="card-header"><h2>Details</h2></div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="grid-2">
+            <div class="field">
+              <label>Name</label>
+              <input id="editName" placeholder="Part name">
+            </div>
+            <div class="field">
+              <label>IPN (optional)</label>
+              <input id="editIPN" placeholder="Internal Part Number">
+            </div>
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <textarea id="editDesc" placeholder="Part description"></textarea>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btnEditSave">💾 Save Changes</button>
+            <div class="status-line" id="editSaveStatus"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Image -->
+      <div class="card" id="editImageCard" style="display:none">
+        <div class="card-header">
+          <h2>Image</h2>
+          <span class="badge">Thumbnail</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="btn-row">
+            <button class="btn" id="btnEditFindImg">🔍 Find Image Online</button>
+            <div class="status-line" id="editImgSearchStatus"></div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Upload from camera / file</label>
+              <input id="editUploadFile" type="file" accept="image/*" capture="environment">
+              <div class="field-hint">On iOS: tap then choose "Take Photo"</div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="btnEditUpload">📤 Upload Image</button>
+            <div class="status-line" id="editUploadStatus"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </div>
 </div>
 
@@ -698,7 +785,7 @@ backdrop.onclick=()=>{sidebar.classList.remove('open');backdrop.classList.remove
 
 // PAGES
 function showPage(id){
-  ['add','kiosk','search','standards'].forEach(p=>{
+  ['add','kiosk','search','standards','edit'].forEach(p=>{
     document.getElementById('page-'+p).classList.toggle('active',p===id);
     document.getElementById('nav-'+p).classList.toggle('active',p===id);
   });
@@ -874,9 +961,12 @@ document.getElementById('imgSuggestUse').onclick=async()=>{
     await apiPOST('/api/part/image-download',{part_id:String(_imgSuggestPartId),image_url:_imgSuggestUrls[_imgSuggestIdx]});
     closeImgSuggestModal();
     const ts='&_='+Date.now();
-    selectedPartThumb.src='/api/part/image-proxy?pk='+_imgSuggestPartId+ts;
-    if(document.getElementById('kioskPartId').value==_imgSuggestPartId)
-      kioskThumb.src='/api/part/image-proxy?pk='+_imgSuggestPartId+ts;
+    const _imgPk=_imgSuggestPartId;
+    selectedPartThumb.src='/api/part/image-proxy?pk='+_imgPk+ts;
+    if(document.getElementById('kioskPartId').value==_imgPk)
+      kioskThumb.src='/api/part/image-proxy?pk='+_imgPk+ts;
+    if(document.getElementById('editPartId').value==_imgPk)
+      document.getElementById('editThumb').src='/api/part/image-proxy?pk='+_imgPk+ts;
     setStatus('createStatus','✅ Image applied','ok');
   }catch(e){
     errEl.textContent='❌ '+e.message+' — try another image.';
@@ -1137,6 +1227,82 @@ document.getElementById('btnSearchGo').addEventListener('click',()=>resetSearch(
 document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')resetSearch(document.getElementById('searchInput').value)});
 document.getElementById('btnSearchMore').addEventListener('click',()=>renderSearch({reset:false}));
 
+// ===================== EDIT PART PAGE =====================
+const editThumb=document.getElementById('editThumb');
+const editPartId=document.getElementById('editPartId');
+const editPartLabel=document.getElementById('editPartLabel');
+editThumb.addEventListener('click',()=>openImageModal(editThumb.src));
+
+attachTypeahead({
+  inputEl:document.getElementById('editSearch'),
+  listEl:document.getElementById('editSearchList'),
+  onQuery:async q=>{
+    const rows=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=10');
+    return rows.map(r=>({pk:r.pk,label:r.name+(r.ipn?' (IPN: '+r.ipn+')':'')}));
+  },
+  onPick:({pk,label})=>loadEditPart(pk,label)
+});
+
+async function loadEditPart(pk,label){
+  editPartId.value=pk;editPartLabel.value=label||'ID '+pk;
+  editThumb.onerror=()=>editThumb.removeAttribute('src');
+  editThumb.src='/api/part/image-proxy?pk='+pk+'&_='+Date.now();
+  document.getElementById('editDetailsCard').style.display='none';
+  document.getElementById('editImageCard').style.display='none';
+  setStatus('editSaveStatus','Loading…','loading');
+  try{
+    const p=await apiGET('/api/parts?q='+encodeURIComponent(label.split(' (IPN')[0])+'&limit=5');
+    const part=p.find(r=>r.pk==pk)||p[0];
+    if(!part)throw new Error('Part not found');
+    document.getElementById('editName').value=part.name||'';
+    document.getElementById('editIPN').value=part.ipn||'';
+    document.getElementById('editDesc').value=part.description||'';
+    document.getElementById('editDetailsCard').style.display='';
+    document.getElementById('editImageCard').style.display='';
+    setStatus('editSaveStatus','','');
+  }catch(e){setStatus('editSaveStatus','❌ '+e.message,'err')}
+}
+
+document.getElementById('btnEditSave').onclick=async()=>{
+  const pk=editPartId.value;if(!pk){setStatus('editSaveStatus','❌ No part selected','err');return}
+  const name=document.getElementById('editName').value.trim();
+  const ipn=document.getElementById('editIPN').value.trim();
+  const desc=document.getElementById('editDesc').value.trim();
+  if(!name){setStatus('editSaveStatus','❌ Name is required','err');return}
+  setStatus('editSaveStatus','Saving…','loading');
+  try{
+    await apiPOST('/api/part/update-meta',{pk:Number(pk),name,description:desc,ipn});
+    setStatus('editSaveStatus','✅ Saved','ok');
+  }catch(e){setStatus('editSaveStatus','❌ '+e.message,'err')}
+};
+
+document.getElementById('btnEditFindImg').onclick=async()=>{
+  const pk=editPartId.value;if(!pk){setStatus('editImgSearchStatus','❌ No part selected','err');return}
+  const query=[document.getElementById('editName').value,document.getElementById('editDesc').value].filter(Boolean).join(' ');
+  setStatus('editImgSearchStatus','Searching…','loading');
+  try{
+    const res=await apiPOST('/api/part/image-search',{query});
+    if(!res.images||!res.images.length){setStatus('editImgSearchStatus','No images found','');return}
+    setStatus('editImgSearchStatus','','');
+    openImgSuggestModal(res.images,Number(pk));
+  }catch(e){setStatus('editImgSearchStatus','❌ '+e.message,'err')}
+};
+
+document.getElementById('btnEditUpload').onclick=async()=>{
+  const pk=editPartId.value;if(!pk){setStatus('editUploadStatus','❌ No part selected','err');return}
+  const file=document.getElementById('editUploadFile').files[0];
+  if(!file){setStatus('editUploadStatus','❌ Pick an image','err');return}
+  setStatus('editUploadStatus','Uploading…','loading');
+  const fd=new FormData();fd.append('part_id',pk);fd.append('image',file);
+  try{
+    const r=await fetch('/api/upload',{method:'POST',body:fd});
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.detail||'Upload failed');
+    editThumb.src='/api/part/image-proxy?pk='+pk+'&_='+Date.now();
+    setStatus('editUploadStatus','✅ Image uploaded','ok');
+  }catch(e){setStatus('editUploadStatus','❌ '+e.message,'err')}
+};
+
 // ===================== NAMING STANDARDS PAGE =====================
 function escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
@@ -1220,10 +1386,10 @@ async function stdAnalyzePart(pk){
     // reset previous state
     nameEl.style.display='none';descEl.style.display='none';
     nameUnch.style.display='none';descUnch.style.display='none';
-    if(nameChanged){nameEl.textContent=sugName;nameEl.style.display='';}
-    else{nameUnch.style.display='';}
-    if(descChanged){descEl.textContent=sugDesc;descEl.style.display='';}
-    else{descUnch.style.display='';}
+    if(nameChanged){nameEl.textContent=sugName;nameEl.style.display='block';}
+    else{nameUnch.style.display='block';}
+    if(descChanged){descEl.textContent=sugDesc;descEl.style.display='block';}
+    else{descUnch.style.display='block';}
     if(nameChanged||descChanged){
       _stdSuggestions[pk]={name:nameChanged?sugName:cur.name,description:descChanged?sugDesc:cur.description};
       acceptBtn.style.display='';skipBtn.style.display='';
