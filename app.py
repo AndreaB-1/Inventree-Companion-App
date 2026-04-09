@@ -17,6 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 from PIL import Image, ImageOps
+# brother_ql uses Image.ANTIALIAS which was removed in Pillow 10; patch it back
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.LANCZOS  # type: ignore[attr-defined]
 
 # InvenTree
 from inventree.api import InvenTreeAPI
