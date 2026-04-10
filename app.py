@@ -1444,10 +1444,15 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
 
 
 def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> Image.Image:
-    """Generate a 12 mm tape label with photo-style layout:
-       [QR] | large-spec-text  (top)
-            |---------------------------
-            | type/info  | diagram icon (bottom)
+    """Generate a 12 mm tape label.
+
+    Layout (left → right, top → bottom):
+      ┌──────┬──────┬─────────────────────────┐
+      │      │      │  Title  (pushed to top)  │
+      │  QR  │  SV  ├──────────────────┬───────┤
+      │      │ box  │  Line1 / Line2   │  TV   │
+      └──────┴──────┴──────────────────┴───────┘
+    QR and diagram columns are individually toggled from the UI.
     """
     from PIL import ImageDraw as _ID
     w = max(LABEL_HEIGHT_PX, round(length_mm * LABEL_DPI / 25.4))
@@ -1458,105 +1463,125 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
     # Outer border
     d.rectangle([0, 0, w - 1, h - 1], outline=0, width=2)
 
-    show_qr = opts.get('show_qr', False)
-    qr_data = (opts.get('qr_data') or '').strip()
+    show_qr  = opts.get('show_qr', False)
+    qr_data  = (opts.get('qr_data') or '').strip()
+    tv_opt   = opts.get('show_topview', True)
+    sv_opt   = opts.get('show_sideview', True)
+    diag_opt = opts.get('show_diagram', True)
 
-    # ── QR code section (left) ──────────────────────────────────────
-    content_x = 3   # x where the right-hand content starts
+    # Vertical split: smaller top section (title) + bigger bottom row (info)
+    # mid_y at ~38 % gives roughly 40 px top / 62 px bottom on 106 px tape
+    mid_y = int(h * 0.38)
+
+    # Each left column is a full-height square, capped so text always has
+    # at least 1/3 of the total label width.
+    cell_w = min(h - 6, max(20, (w - 6) // 3))
+
+    content_x = 3   # advances rightward as columns are added
+
+    # ── Column 1: QR code (optional) ────────────────────────────────
     if show_qr and qr_data:
-        # Keep QR square; cap at half the label width so text still fits
-        qr_size = min(h - 6, (w - 6) // 2)
         qr_placed = False
         try:
             import qrcode as _qrcode
-            qr = _qrcode.QRCode(
-                version=None,
-                error_correction=_qrcode.constants.ERROR_CORRECT_M,
-                box_size=1,
-                border=1,
-            )
+            qr = _qrcode.QRCode(version=None,
+                                error_correction=_qrcode.constants.ERROR_CORRECT_M,
+                                box_size=1, border=1)
             qr.add_data(qr_data)
             qr.make(fit=True)
             qr_img = qr.make_image(fill_color='black', back_color='white').convert('RGB')
-            qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)
-            img.paste(qr_img, (3, (h - qr_size) // 2))
+            qr_img = qr_img.resize((cell_w, cell_w), Image.NEAREST)
+            img.paste(qr_img, (content_x, (h - cell_w) // 2))
             qr_placed = True
         except ImportError:
             pass
         if not qr_placed:
-            # Placeholder box labelled "QR"
-            d.rectangle([3, 3, 3 + qr_size, 3 + qr_size], outline=0, width=1)
-            d.text((6, 6), 'QR', fill=0, font=_hw_font(9))
-        content_x = 3 + qr_size + 2
-        # Vertical divider separating QR from text area
+            d.rectangle([content_x, 3, content_x + cell_w - 1, h - 4], outline=0, width=1)
+            d.text((content_x + 4, 6), 'QR', fill=0, font=_hw_font(9))
+        content_x += cell_w
         d.line([(content_x, 2), (content_x, h - 3)], fill=0, width=1)
         content_x += 3
 
-    content_w = w - content_x - 3   # usable width for text + diagram
+    # ── Column 2: Side view box (optional, full-height, same width as QR) ──
+    show_sv = diag_opt and sv_opt and bool(_HW_SV.get(hw_type))
+    if show_sv:
+        sv_x0 = content_x
+        d.rectangle([sv_x0, 3, sv_x0 + cell_w - 1, h - 4], outline=0, width=1)
+        _HW_SV[hw_type](d, specs, sv_x0 + 3, 6, cell_w - 6, h - 12)
+        content_x = sv_x0 + cell_w
+        d.line([(content_x, 2), (content_x, h - 3)], fill=0, width=1)
+        content_x += 3
 
-    # ── Diagram in the bottom-right corner ──────────────────────────
-    tv   = opts.get('show_topview', True)
-    sv_  = opts.get('show_sideview', True)
-    diag = opts.get('show_diagram', True) and (tv or sv_)
+    content_w = w - content_x - 3   # remaining width for title + bottom info
 
-    mid_y = h // 2          # y of the horizontal divider
-    bot_h = h - mid_y - 4   # height of the bottom half
+    # ── Bottom-right cell: top view ──────────────────────────────────
+    bot_h = h - mid_y - 4
+    show_tv = diag_opt and tv_opt and bool(_HW_TV.get(hw_type)) and content_w > 50
+    tv_col_w = 0
+    if show_tv:
+        tv_col_w = min(bot_h, max(28, content_w // 4))
 
-    diag_w = 0
-    diag_x = w - 3          # will be adjusted if diagram is shown
-    if diag and content_w > 40:
-        # Diagram occupies a square cell in the bottom-right
-        diag_w = min(bot_h, max(24, content_w // 4))
-        diag_x = w - 3 - diag_w
-
-    # Horizontal mid-divider (full width of right section)
+    # ── Horizontal mid divider ───────────────────────────────────────
     d.line([(content_x - 1, mid_y), (w - 2, mid_y)], fill=0, width=1)
 
-    # Vertical divider between bottom-text and diagram
-    if diag and diag_w > 0 and diag_x > content_x + 8:
-        d.line([(diag_x, mid_y + 1), (diag_x, h - 3)], fill=0, width=1)
-        _draw_hw_diagram(d, hw_type, specs,
-                         diag_x + 2, mid_y + 2,
-                         diag_w - 3, bot_h - 1,
-                         tv, sv_)
+    # Top-view rendering
+    if show_tv and tv_col_w > 0:
+        tv_x = w - 3 - tv_col_w
+        if tv_x > content_x + 10:
+            d.line([(tv_x, mid_y + 1), (tv_x, h - 3)], fill=0, width=1)
+            _HW_TV[hw_type](d, specs, tv_x + 2, mid_y + 2, tv_col_w - 4, bot_h - 3)
 
-    # ── TOP HALF: primary spec text (large, centred) ─────────────────
+    # ── TOP SECTION: title, pushed to very top, horizontally centred ─
     lines = _label_lines(hw_type, specs, opts)
-    top_h = mid_y - 3
+    top_avail_h = mid_y - 5   # pixels available for title text
     if lines:
-        f_main = _hw_font(11)
+        f_title = _hw_font(11)
         for sz in [32, 28, 24, 20, 16, 13, 11]:
             f = _hw_font(sz)
             try:
                 bb = d.textbbox((0, 0), lines[0], font=f)
-                if bb[2] - bb[0] <= content_w - 4:
-                    f_main = f
+                if (bb[2] - bb[0]) <= content_w - 4 and (bb[3] - bb[1]) <= top_avail_h:
+                    f_title = f
                     break
             except Exception:
-                f_main = _hw_font(sz)
+                f_title = _hw_font(sz)
                 break
         try:
-            bb = d.textbbox((0, 0), lines[0], font=f_main)
-            tw_ = bb[2] - bb[0]
-            th_ = bb[3] - bb[1]
-            tx = content_x + max(0, (content_w - tw_) // 2)
-            ty = max(2, (mid_y - th_) // 2)
+            bb = d.textbbox((0, 0), lines[0], font=f_title)
+            tx = content_x + max(0, (content_w - (bb[2] - bb[0])) // 2)
         except Exception:
-            tx, ty = content_x + 3, 4
-        d.text((tx, ty), lines[0], fill=0, font=f_main)
+            tx = content_x + 3
+        d.text((tx, 3), lines[0], fill=0, font=f_title)
 
-    # ── BOTTOM HALF: secondary lines (type, material, standard) ──────
-    fs = _hw_font(11)
-    yp = mid_y + 3
-    max_text_x = diag_x - 3 if (diag and diag_w > 0) else w - 5
-    for line in lines[1:]:
-        if yp + 10 > h - 3:
-            break
-        d.text((content_x, yp), line, fill=0, font=fs)
-        try:
-            yp = d.textbbox((content_x, yp), line, font=fs)[3] + 2
-        except Exception:
-            yp += 13
+    # ── BOTTOM SECTION: up to 2 lines, font auto-sized to fill height ─
+    secondary = lines[1:3]
+    text_right = (w - 3 - tv_col_w - 3) if (show_tv and tv_col_w > 0) else (w - 5)
+    text_w_bot = text_right - content_x - 4
+    if secondary and text_w_bot > 10:
+        per_line_h = (bot_h - 4) // len(secondary)
+        fs = _hw_font(11)
+        for sz in [28, 24, 20, 18, 16, 14, 13, 11]:
+            f = _hw_font(sz)
+            fits = True
+            for line in secondary:
+                try:
+                    bb = d.textbbox((0, 0), line, font=f)
+                    if (bb[2] - bb[0]) > text_w_bot or (bb[3] - bb[1]) > per_line_h:
+                        fits = False
+                        break
+                except Exception:
+                    fits = False
+                    break
+            if fits:
+                fs = f
+                break
+        yp = mid_y + 3
+        for line in secondary:
+            d.text((content_x + 2, yp), line, fill=0, font=fs)
+            try:
+                yp = d.textbbox((content_x + 2, yp), line, font=fs)[3] + 2
+            except Exception:
+                yp += per_line_h
 
     return img
 
