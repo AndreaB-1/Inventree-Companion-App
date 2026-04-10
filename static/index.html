@@ -781,10 +781,17 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
         <div class="card-header"><h2>Label Options</h2><span class="badge">12 mm tape</span></div>
         <div class="grid-2" style="gap:12px;margin-bottom:14px">
           <div class="field">
-            <label>Label Length (mm)</label>
-            <input type="number" id="hwLabelLength" value="36" min="12" max="200" step="1">
-            <div class="field-hint">Tape width is fixed at 12 mm</div>
+            <label>Total Tape Length (mm)</label>
+            <input type="number" id="hwLabelLength" value="36" min="12" max="200" step="1" oninput="hwUpdateTapeHint()">
+            <div class="field-hint" id="hwTapeHint">Content area: 36 mm</div>
           </div>
+          <div class="field">
+            <label>Cut Margin (mm per side)</label>
+            <input type="number" id="hwCutMargin" value="0" min="0" max="15" step="0.5" oninput="hwUpdateTapeHint()">
+            <div class="field-hint">Printer dead zone each end — set to 3 for QL-710W</div>
+          </div>
+        </div>
+        <div class="grid-2" style="gap:12px;margin-bottom:14px">
           <div class="field">
             <label>Copies</label>
             <input type="number" id="hwCopies" value="1" min="1" max="99" step="1">
@@ -1718,6 +1725,10 @@ function initLabelsPage(){
   // Restore saved printer
   const saved=localStorage.getItem('hw_label_printer');
   if(saved)document.getElementById('hwPrinterAddr').value=saved;
+  // Restore saved cut margin and update hint
+  const savedMargin=localStorage.getItem('hw_cut_margin');
+  if(savedMargin!==null)document.getElementById('hwCutMargin').value=savedMargin;
+  hwUpdateTapeHint();
   // Select default type
   hwSelectType('screw');
 }
@@ -1811,6 +1822,19 @@ function hwCollectSpecs(){
   return specs;
 }
 
+function hwUpdateTapeHint(){
+  const len=parseFloat(document.getElementById('hwLabelLength').value)||36;
+  const margin=parseFloat(document.getElementById('hwCutMargin').value)||0;
+  const content=Math.max(5,len-2*margin);
+  const hint=document.getElementById('hwTapeHint');
+  if(margin>0){
+    hint.textContent=`Content area: ${content.toFixed(1)} mm  (${margin} mm margin each end)`;
+  }else{
+    hint.textContent=`Content area: ${len} mm  (no cut margin set)`;
+  }
+  localStorage.setItem('hw_cut_margin',margin);
+}
+
 function hwCollectOptions(){
   return{
     show_diagram:document.getElementById('hwOptDiagram').checked,
@@ -1821,6 +1845,7 @@ function hwCollectOptions(){
     show_grade:document.getElementById('hwOptGrade').checked,
     show_qr:document.getElementById('hwOptQR').checked,
     qr_data:(document.getElementById('hwQRData').value||'').trim(),
+    cut_margin_mm_per_side:parseFloat(document.getElementById('hwCutMargin').value)||0,
   };
 }
 

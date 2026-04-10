@@ -1645,7 +1645,10 @@ def hw_label_generate(payload: dict):
         specs   = payload.get("specs", {})
         length  = float(payload.get("label_length_mm", 36))
         opts    = payload.get("options", {})
-        img    = _make_hw_label(hw_type, specs, length, opts)
+        # Subtract printer cut margins so the image fills the desired tape length
+        cut_margin = float(opts.get("cut_margin_mm_per_side", 0))
+        image_length = max(10.0, length - 2 * cut_margin)
+        img    = _make_hw_label(hw_type, specs, image_length, opts)
         tv_img = _make_view_img(hw_type, specs, 200, 'top')
         sv_img = _make_view_img(hw_type, specs, 200, 'side')
         return {
@@ -1680,7 +1683,10 @@ def hw_label_print(payload: dict):
         if not printer.startswith(('tcp://', 'usb://')):
             printer = f'tcp://{printer}'
         backend = 'network' if printer.startswith('tcp://') else 'pyusb'
-        img = _make_hw_label(hw_type, specs, length, opts)
+        # Subtract printer cut margins so the image fills the desired tape length
+        cut_margin = float(opts.get("cut_margin_mm_per_side", 0))
+        image_length = max(10.0, length - 2 * cut_margin)
+        img = _make_hw_label(hw_type, specs, image_length, opts)
         # brother_ql expects portrait orientation: width = tape width (106px),
         # height = label length. Our image is landscape (length × 106h), so
         # rotate 90° clockwise to produce the correct 106w × length_h portrait.
