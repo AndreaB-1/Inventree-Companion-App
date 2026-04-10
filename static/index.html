@@ -798,6 +798,16 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
           <label class="lbl-checkbox"><input type="checkbox" id="hwOptStandard" checked> Standard</label>
           <label class="lbl-checkbox"><input type="checkbox" id="hwOptGrade" checked> Show grade</label>
         </div>
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptQR" onchange="document.getElementById('hwQRDataRow').style.display=this.checked?'':'none'"> Show QR code</label>
+          <div id="hwQRDataRow" style="display:none;margin-top:10px">
+            <div class="field">
+              <label>QR Code Data / URL</label>
+              <input type="text" id="hwQRData" placeholder="e.g. https://inventree.local/part/42/ or free text">
+              <div class="field-hint">Text or URL to encode in the QR code on the left side of the label</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Printer -->
@@ -1809,6 +1819,8 @@ function hwCollectOptions(){
     show_material:document.getElementById('hwOptMaterial').checked,
     show_standard:document.getElementById('hwOptStandard').checked,
     show_grade:document.getElementById('hwOptGrade').checked,
+    show_qr:document.getElementById('hwOptQR').checked,
+    qr_data:(document.getElementById('hwQRData').value||'').trim(),
   };
 }
 
