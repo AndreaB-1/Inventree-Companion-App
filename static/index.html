@@ -806,13 +806,78 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
           <label class="lbl-checkbox"><input type="checkbox" id="hwOptGrade" checked> Show grade</label>
         </div>
         <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-          <label class="lbl-checkbox"><input type="checkbox" id="hwOptQR" onchange="document.getElementById('hwQRDataRow').style.display=this.checked?'':'none'"> Show QR code</label>
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptQR" onchange="hwOnQRToggle(this.checked)"> Show QR code</label>
           <div id="hwQRDataRow" style="display:none;margin-top:10px">
-            <div class="field">
-              <label>QR Code Data / URL</label>
-              <input type="text" id="hwQRData" placeholder="e.g. https://inventree.local/part/42/ or free text">
-              <div class="field-hint">Text or URL to encode in the QR code on the left side of the label</div>
+
+            <!-- Mode tabs -->
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <button class="btn sm primary" id="hwQRBtnSearch" onclick="hwQRSetMode('search')">🔍 Link Existing Part</button>
+              <button class="btn sm" id="hwQRBtnCreate" onclick="hwQRSetMode('create')">➕ Create New Part</button>
             </div>
+
+            <!-- Currently linked part pill -->
+            <div id="hwQRLinked" style="display:none;margin-bottom:10px;padding:6px 10px;background:var(--bg-2);border-radius:6px;font-size:12px;display:none">
+              <span>✅ Linked: <strong id="hwQRLinkedName"></strong> <span style="color:var(--text-3)">(ID: <span id="hwQRLinkedId"></span>)</span></span>
+              <button onclick="hwQRClear()" style="float:right;background:none;border:none;cursor:pointer;color:var(--text-3);font-size:11px;padding:0">✕ Clear</button>
+            </div>
+
+            <!-- SEARCH panel -->
+            <div id="hwQRSearchPanel">
+              <div class="field dropdown" id="hwPartSearchWrap">
+                <label>Search InvenTree part</label>
+                <input type="text" id="hwPartSearchInput" placeholder="Type part name or IPN…" autocomplete="off">
+                <div id="hwPartSearchList" class="dropdown-list"></div>
+                <div class="field-hint">Select a part to encode {"part": id} in the QR code</div>
+              </div>
+            </div>
+
+            <!-- CREATE panel -->
+            <div id="hwQRCreatePanel" style="display:none">
+              <div class="grid-2" style="gap:10px;margin-bottom:10px">
+                <div class="field">
+                  <label>Part Name</label>
+                  <input type="text" id="hwNewName" placeholder="e.g. M5×8 Button Head Screw A2">
+                </div>
+                <div class="field">
+                  <label>IPN (optional)</label>
+                  <input type="text" id="hwNewIPN" placeholder="Internal Part Number">
+                </div>
+              </div>
+              <div class="field" style="margin-bottom:10px">
+                <label>Description</label>
+                <textarea id="hwNewDesc" rows="2" placeholder="Full description…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
+              </div>
+              <div class="grid-2" style="gap:10px;margin-bottom:10px">
+                <div class="field">
+                  <label>Initial Qty</label>
+                  <input type="number" id="hwNewQty" placeholder="0" min="0" step="1">
+                </div>
+                <div class="field dropdown" id="hwNewLocWrap">
+                  <label>Location</label>
+                  <input type="text" id="hwNewLocSearch" placeholder="Type to search…" autocomplete="off">
+                  <div id="hwNewLocList" class="dropdown-list"></div>
+                  <input type="hidden" id="hwNewLocId">
+                </div>
+              </div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:12px;font-weight:600;color:var(--text-2);display:block;margin-bottom:6px">Part Image</label>
+                <div class="grid-2" style="gap:10px">
+                  <div class="field">
+                    <label>Upload file / camera</label>
+                    <input type="file" id="hwNewImage" accept="image/*" capture="environment">
+                  </div>
+                  <div class="field" style="display:flex;align-items:flex-end">
+                    <button class="btn sm" onclick="hwNewPartImageSearch()">🔍 Search online</button>
+                  </div>
+                </div>
+              </div>
+              <div class="btn-row" style="flex-wrap:wrap;gap:6px">
+                <button class="btn sm" onclick="hwAutoFillQRCreate()" title="Overwrite fields with values from the spec form above">♻ Auto-fill from specs</button>
+                <button class="btn primary" onclick="hwCreateAndLinkPart()">✅ Create &amp; Link QR</button>
+                <div class="status-line" id="hwCreatePartStatus"></div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -1708,6 +1773,8 @@ const HW_TYPES={
 let _hwCurrentType='screw';
 let _hwLabelB64=null;
 let _hwLabelsInited=false;
+let _hwQRPartId=null;       // pk of the InvenTree part linked to the QR code
+let _hwQRSectionInited=false;
 
 function initLabelsPage(){
   if(_hwLabelsInited)return;
@@ -1844,7 +1911,7 @@ function hwCollectOptions(){
     show_standard:document.getElementById('hwOptStandard').checked,
     show_grade:document.getElementById('hwOptGrade').checked,
     show_qr:document.getElementById('hwOptQR').checked,
-    qr_data:(document.getElementById('hwQRData').value||'').trim(),
+    qr_data:_hwQRPartId ? JSON.stringify({part:parseInt(_hwQRPartId,10)}) : '',
     cut_margin_mm_per_side:parseFloat(document.getElementById('hwCutMargin').value)||0,
   };
 }
@@ -1934,6 +2001,197 @@ function hwDownloadLabel(){
   const sz=specs.thread_size||specs.fits_size||specs.diameter_mm||specs.shaft_diameter_mm||'';
   a.download=`label_${type}_${sz}.png`.replace(/\s+/g,'_');
   a.click();
+}
+
+// ── QR / Part linking ──────────────────────────────────────────────
+
+function hwOnQRToggle(checked){
+  document.getElementById('hwQRDataRow').style.display=checked?'':'none';
+  if(checked) hwInitQRSection();
+}
+
+function hwInitQRSection(){
+  if(_hwQRSectionInited)return;
+  _hwQRSectionInited=true;
+  // Part search typeahead
+  attachTypeahead({
+    inputEl:document.getElementById('hwPartSearchInput'),
+    listEl:document.getElementById('hwPartSearchList'),
+    onQuery:async(q)=>{
+      const res=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=10');
+      return res.map(p=>({pk:p.pk,label:p.name+(p.ipn?' ['+p.ipn+']':'')}));
+    },
+    onPick:(item)=>{
+      _hwQRPartId=item.pk;
+      document.getElementById('hwQRLinkedName').textContent=item.label;
+      document.getElementById('hwQRLinkedId').textContent=item.pk;
+      document.getElementById('hwQRLinked').style.display='';
+      document.getElementById('hwPartSearchInput').value='';
+    }
+  });
+  // Location typeahead for new-part form
+  attachTypeahead({
+    inputEl:document.getElementById('hwNewLocSearch'),
+    listEl:document.getElementById('hwNewLocList'),
+    onQuery:async(q)=>{
+      const res=await apiGET('/api/locations?q='+encodeURIComponent(q)+'&limit=12');
+      return res.map(l=>({pk:l.pk,label:l.pathstring||l.name}));
+    },
+    onPick:(item)=>{
+      document.getElementById('hwNewLocId').value=item.pk;
+      document.getElementById('hwNewLocSearch').value=item.label;
+    }
+  });
+}
+
+function hwQRSetMode(mode){
+  const isSearch=mode==='search';
+  document.getElementById('hwQRSearchPanel').style.display=isSearch?'':'none';
+  document.getElementById('hwQRCreatePanel').style.display=isSearch?'none':'';
+  document.getElementById('hwQRBtnSearch').className='btn sm'+(isSearch?' primary':'');
+  document.getElementById('hwQRBtnCreate').className='btn sm'+(isSearch?'':' primary');
+  if(!isSearch) hwAutoFillQRCreate();
+}
+
+function hwQRClear(){
+  _hwQRPartId=null;
+  document.getElementById('hwQRLinked').style.display='none';
+  document.getElementById('hwPartSearchInput').value='';
+}
+
+// ── Suggested name / description from current specs ────────────────
+
+function hwSuggestName(){
+  const t=_hwCurrentType; if(!t)return'';
+  const s=hwCollectSpecs();
+  if(t==='screw'){
+    const sz=(s.thread_size||'')+(s.length_mm?'×'+s.length_mm:'');
+    return[sz,s.head_type,'Screw',s.material].filter(Boolean).join(' ');
+  }
+  if(t==='nut')  return[s.thread_size,s.nut_type,'Nut',s.material].filter(Boolean).join(' ');
+  if(t==='washer')return[s.fits_size,s.washer_type,'Washer',s.material].filter(Boolean).join(' ');
+  if(t==='standoff'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.standoff_type,'Standoff',s.body_material].filter(Boolean).join(' ');
+  }
+  if(t==='rivet'){
+    const dia=s.diameter_mm?'Ø'+s.diameter_mm+'mm':'';
+    return[dia,s.rivet_type,'Rivet',s.material].filter(Boolean).join(' ');
+  }
+  if(t==='pin'){
+    const sz=(s.diameter_mm&&s.length_mm)?'Ø'+s.diameter_mm+'×'+s.length_mm+'mm':(s.diameter_mm?'Ø'+s.diameter_mm+'mm':'');
+    return[sz,s.pin_type,s.material].filter(Boolean).join(' ');
+  }
+  if(t==='circlip'){
+    const dia=s.shaft_diameter_mm?'Ø'+s.shaft_diameter_mm+'mm':'';
+    return[dia,s.circlip_type,'Circlip',s.material].filter(Boolean).join(' ');
+  }
+  if(t==='insert'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.install_method,'Insert',s.material].filter(Boolean).join(' ');
+  }
+  return t.charAt(0).toUpperCase()+t.slice(1);
+}
+
+function hwSuggestDesc(){
+  const t=_hwCurrentType; if(!t)return'';
+  const s=hwCollectSpecs();
+  if(t==='screw'){
+    const sz=(s.thread_size||'')+(s.length_mm?'×'+s.length_mm:'')+(s.pitch_mm?' p'+s.pitch_mm:'');
+    return[sz,s.head_type,s.drive,'Screw',s.standard,(s.material||'')+(s.grade?' '+s.grade:'')].filter(Boolean).join(' – ');
+  }
+  if(t==='nut'){
+    const sz=(s.thread_size||'')+(s.pitch_mm?' p'+s.pitch_mm:'');
+    return[sz,s.nut_type,'Nut',s.standard,(s.material||'')+(s.grade?' '+s.grade:'')].filter(Boolean).join(' – ');
+  }
+  if(t==='washer')
+    return[s.fits_size,s.washer_type,'Washer',s.standard,s.material].filter(Boolean).join(' – ');
+  if(t==='standoff'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.standoff_type,'Standoff',s.body_material].filter(Boolean).join(' – ');
+  }
+  if(t==='rivet'){
+    const dia=s.diameter_mm?'Ø'+s.diameter_mm+'mm':'';
+    const grip=(s.grip_min||s.grip_max)?'grip '+(s.grip_min||'')+'–'+(s.grip_max||'')+'mm':'';
+    return[dia,s.rivet_type,'Rivet',grip,s.material].filter(Boolean).join(' – ');
+  }
+  if(t==='pin'){
+    const sz=(s.diameter_mm&&s.length_mm)?'Ø'+s.diameter_mm+'×'+s.length_mm+'mm':(s.diameter_mm?'Ø'+s.diameter_mm+'mm':'');
+    return[sz,s.pin_type,s.tolerance,s.material].filter(Boolean).join(' – ');
+  }
+  if(t==='circlip'){
+    const dia=s.shaft_diameter_mm?'Ø'+s.shaft_diameter_mm+'mm':'';
+    return[dia,s.circlip_type,'Circlip',s.material].filter(Boolean).join(' – ');
+  }
+  if(t==='insert'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.install_method,'Thread Insert',s.material].filter(Boolean).join(' – ');
+  }
+  return'';
+}
+
+function hwAutoFillQRCreate(){
+  document.getElementById('hwNewName').value=hwSuggestName();
+  document.getElementById('hwNewDesc').value=hwSuggestDesc();
+}
+
+// ── Create part and link QR ────────────────────────────────────────
+
+async function hwCreateAndLinkPart(){
+  const name=document.getElementById('hwNewName').value.trim();
+  const st=document.getElementById('hwCreatePartStatus');
+  if(!name){setStatus(st,'Name is required','err');return;}
+  const desc=document.getElementById('hwNewDesc').value.trim();
+  const ipn=document.getElementById('hwNewIPN').value.trim();
+  const qty=document.getElementById('hwNewQty').value.trim();
+  const locId=document.getElementById('hwNewLocId').value.trim();
+  setStatus(st,'Creating part…','loading');
+  try{
+    const fd=new FormData();
+    fd.append('name',name);
+    if(desc)fd.append('description',desc);
+    if(ipn)fd.append('ipn',ipn);
+    if(qty)fd.append('initial_qty',qty);
+    if(qty&&locId)fd.append('location_id',locId);
+    const r=await fetch('/api/part/create',{method:'POST',body:fd});
+    const j=await r.json();
+    if(!r.ok){setStatus(st,'❌ '+(j.detail||'Failed'),'err');return;}
+    // Link QR to the new part
+    _hwQRPartId=j.pk;
+    document.getElementById('hwQRLinkedName').textContent=j.name;
+    document.getElementById('hwQRLinkedId').textContent=j.pk;
+    document.getElementById('hwQRLinked').style.display='';
+    setStatus(st,'✅ Created: '+j.name+' (ID: '+j.pk+')','ok');
+    // Upload image file if one was chosen
+    const imgFile=document.getElementById('hwNewImage').files[0];
+    if(imgFile){
+      const imgFd=new FormData();
+      imgFd.append('part_id',j.pk);
+      imgFd.append('image',imgFile);
+      fetch('/api/upload',{method:'POST',body:imgFd});
+    }else{
+      // Auto-suggest internet images (same flow as main create page)
+      const q=[name,desc].filter(Boolean).join(' ');
+      apiPOST('/api/part/image-search',{query:q})
+        .then(res=>{if(res.images?.length)openImgSuggestModal(res.images,j.pk);})
+        .catch(()=>{});
+    }
+  }catch(e){setStatus(st,'❌ '+e.message,'err');}
+}
+
+async function hwNewPartImageSearch(){
+  const name=document.getElementById('hwNewName').value.trim();
+  const desc=document.getElementById('hwNewDesc').value.trim();
+  const q=[name,desc].filter(Boolean).join(' ');
+  const st=document.getElementById('hwCreatePartStatus');
+  if(!q){setStatus(st,'Enter a name first','err');return;}
+  if(!_hwQRPartId){setStatus(st,'Create the part first, then search for images','err');return;}
+  setStatus(st,'Searching…','loading');
+  try{
+    const res=await apiPOST('/api/part/image-search',{query:q});
+    if(res.images?.length)openImgSuggestModal(res.images,_hwQRPartId);
+    setStatus(st,'','ok');
+  }catch(e){setStatus(st,'❌ '+e.message,'err');}
 }
 </script>
 <script>
