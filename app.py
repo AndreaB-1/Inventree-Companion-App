@@ -1581,13 +1581,27 @@ def _make_view_img(hw_type: str, specs: dict, size: int = 200, which: str = 'top
 
 @app.get("/api/labels/hardware/printer-test")
 def hw_printer_test(printer: str):
-    """Verify that brother_ql is installed and the printer address parses correctly."""
+    """Verify brother_ql is installed and the printer is reachable over the network."""
+    import socket
     try:
         from brother_ql.raster import BrotherQLRaster  # noqa: F401
-        addr = printer if printer.startswith(('tcp://', 'usb://')) else f'tcp://{printer}'
-        return {"ok": True, "printer": addr}
     except ImportError:
         raise HTTPException(status_code=500, detail="brother_ql not installed")
+    try:
+        addr = printer if printer.startswith(('tcp://', 'usb://')) else f'tcp://{printer}'
+        if addr.startswith('tcp://'):
+            # Parse host and port (default Brother port is 9100)
+            hostport = addr[len('tcp://'):]
+            if ':' in hostport:
+                host, port_str = hostport.rsplit(':', 1)
+                port = int(port_str)
+            else:
+                host, port = hostport, 9100
+            sock = socket.create_connection((host, port), timeout=3)
+            sock.close()
+        return {"ok": True, "printer": addr}
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Cannot reach printer: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1652,5 +1666,14 @@ def hw_label_print(payload: dict):
         return {"ok": True}
     except HTTPException:
         raise
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Cannot reach printer at {printer}: {e}. "
+                "Check the address, make sure the printer is on and connected "
+                "to the same network as this server, then use 'Test Connection' to verify."
+            ),
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
