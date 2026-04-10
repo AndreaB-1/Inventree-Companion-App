@@ -1069,7 +1069,7 @@ def _tv_screw(d, specs, x, y, w, h):
     if head == 'Hex':
         d.polygon(_hex_pts(cx, cy, r), outline=0)
     else:
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=2)
     dr = max(2, int(r * 0.5))
     if drive == 'Hex (Allen)':
         d.polygon(_hex_pts(cx, cy, dr), fill=0)
@@ -1095,15 +1095,15 @@ def _tv_nut(d, specs, x, y, w, h):
     r = max(4, min(w, h) // 2 - 2)
     d.polygon(_hex_pts(cx, cy, r), outline=0)
     hr = max(2, int(r * 0.45))
-    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=1)
+    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=2)
 
 
 def _tv_washer(d, specs, x, y, w, h):
     cx, cy = x + w // 2, y + h // 2
     ro = max(5, min(w, h) // 2 - 2)
     ri = max(2, int(ro * 0.4))
-    d.ellipse([cx - ro, cy - ro, cx + ro, cy + ro], outline=0, width=1)
-    d.ellipse([cx - ri, cy - ri, cx + ri, cy + ri], outline=0, width=1)
+    d.ellipse([cx - ro, cy - ro, cx + ro, cy + ro], outline=0, width=2)
+    d.ellipse([cx - ri, cy - ri, cx + ri, cy + ri], outline=0, width=2)
 
 
 def _tv_standoff(d, specs, x, y, w, h):
@@ -1112,15 +1112,15 @@ def _tv_standoff(d, specs, x, y, w, h):
     if specs.get('body_shape', 'Hex') == 'Hex':
         d.polygon(_hex_pts(cx, cy, r), outline=0)
     else:
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=2)
     hr = max(2, int(r * 0.35))
-    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=1)
+    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=2)
 
 
 def _tv_rivet(d, specs, x, y, w, h):
     cx, cy = x + w // 2, y + h // 2
     r = max(4, min(w, h) // 2 - 2)
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=2)
     if specs.get('rivet_type', '') == 'Blind/Pop':
         mr = max(1, r // 3)
         d.ellipse([cx - mr, cy - mr, cx + mr, cy + mr], fill=0)
@@ -1129,9 +1129,9 @@ def _tv_rivet(d, specs, x, y, w, h):
 def _tv_pin(d, specs, x, y, w, h):
     cx, cy = x + w // 2, y + h // 2
     r = max(3, min(w, h) // 2 - 3)
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=2)
     if specs.get('pin_type', '') in ('Roll Pin (Spring)', 'Slotted'):
-        d.line([(cx - r, cy), (cx + r, cy)], fill=0, width=1)
+        d.line([(cx - r, cy), (cx + r, cy)], fill=0, width=2)
 
 
 def _tv_circlip(d, specs, x, y, w, h):
@@ -1145,7 +1145,7 @@ def _tv_circlip(d, specs, x, y, w, h):
         a2 = math.radians(min(a + 5, end))
         for ri_ in [ri, ro]:
             d.line([(cx + ri_ * math.cos(a1), cy + ri_ * math.sin(a1)),
-                    (cx + ri_ * math.cos(a2), cy + ri_ * math.sin(a2))], fill=0, width=1)
+                    (cx + ri_ * math.cos(a2), cy + ri_ * math.sin(a2))], fill=0, width=2)
     rm = (ri + ro) // 2
     for a in range(start, end, 3):
         a1 = math.radians(a + 1.5)
@@ -1158,16 +1158,16 @@ def _tv_circlip(d, specs, x, y, w, h):
 def _tv_insert(d, specs, x, y, w, h):
     cx, cy = x + w // 2, y + h // 2
     r = max(4, min(w, h) // 2 - 2)
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=1)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=2)
     hr = max(2, int(r * 0.35))
-    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=1)
+    d.ellipse([cx - hr, cy - hr, cx + hr, cy + hr], fill='white', outline=0, width=2)
     for i in range(3):
         a = math.radians(i * 60)
         lx  = cx + (r - 1) * math.cos(a)
         ly_ = cy + (r - 1) * math.sin(a)
         lx2 = cx + (r + 3) * math.cos(a + math.radians(15))
         ly2 = cy + (r + 3) * math.sin(a + math.radians(15))
-        d.line([(lx, ly_), (lx2, ly2)], fill=0, width=1)
+        d.line([(lx, ly_), (lx2, ly2)], fill=0, width=2)
 
 
 # ── side-view renderers ────────────────────────────────────────────
@@ -1186,14 +1186,16 @@ def _sv_screw(d, specs, x, y, w, h):
     elif head == 'Set Screw':
         hh = 0; sh = h - 2
     elif head == 'Button':
-        dome = hh * 2
-        d.pieslice([hx1, y - dome // 2, hx2, y + dome // 2], 180, 360, fill=0, outline=0)
+        # Arc from 180°→360° = upper half of ellipse; bbox shifts down by hh so
+        # the flat chord lands exactly at y+hh (stem top), dome peak at y.
+        d.arc([hx1, y, hx2, y + hh * 2], 180, 360, fill=0, width=2)
+        d.line([(hx1, y + hh), (hx2, y + hh)], fill=0, width=2)
     elif head == 'Flange Hex':
-        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=1)
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
         d.rectangle([hx1 - 2, y + hh, hx2 + 2, y + hh + 2], fill=0)
     else:
-        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=1)
-    d.rectangle([sx1, y + hh, sx2, y + hh + sh], outline=0, width=1)
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
+    d.rectangle([sx1, y + hh, sx2, y + hh + sh], outline=0, width=2)
     nt = max(3, sh // 5)
     step = sh / nt
     for i in range(nt):
@@ -1215,8 +1217,8 @@ def _sv_nut(d, specs, x, y, w, h):
         (nx + c, ny + nut_h), (nx, ny + nut_h - c), (nx, ny + c),
     ], outline=0)
     d.rectangle([cx - hr, ny, cx + hr, ny + nut_h], fill='white')
-    d.line([(cx - hr, ny), (cx - hr, ny + nut_h)], fill=0, width=1)
-    d.line([(cx + hr, ny), (cx + hr, ny + nut_h)], fill=0, width=1)
+    d.line([(cx - hr, ny), (cx - hr, ny + nut_h)], fill=0, width=2)
+    d.line([(cx + hr, ny), (cx + hr, ny + nut_h)], fill=0, width=2)
 
 
 def _sv_washer(d, specs, x, y, w, h):
@@ -1227,8 +1229,8 @@ def _sv_washer(d, specs, x, y, w, h):
     sy = y + (h - t) // 2
     lx = cx - ro
     gap = ro - ri
-    d.rectangle([lx, sy, lx + gap, sy + t], outline=0, width=1)
-    d.rectangle([lx + gap + ri * 2, sy, lx + ro * 2, sy + t], outline=0, width=1)
+    d.rectangle([lx, sy, lx + gap, sy + t], outline=0, width=2)
+    d.rectangle([lx + gap + ri * 2, sy, lx + ro * 2, sy + t], outline=0, width=2)
 
 
 def _sv_standoff(d, specs, x, y, w, h):
@@ -1238,16 +1240,16 @@ def _sv_standoff(d, specs, x, y, w, h):
     by = y + (h - bh) // 2
     hr = max(2, int(r * 0.35))
     st = specs.get('standoff_type', 'Hex F-F')
-    d.rectangle([cx - r, by, cx + r, by + bh], outline=0, width=1)
-    d.line([(cx - hr, by), (cx - hr, by + bh)], fill=0, width=1)
-    d.line([(cx + hr, by), (cx + hr, by + bh)], fill=0, width=1)
+    d.rectangle([cx - r, by, cx + r, by + bh], outline=0, width=2)
+    d.line([(cx - hr, by), (cx - hr, by + bh)], fill=0, width=2)
+    d.line([(cx + hr, by), (cx + hr, by + bh)], fill=0, width=2)
     tl = max(4, bh // 5)
     sw2 = max(3, hr * 2)
     if 'M-F' in st:
-        d.rectangle([cx - sw2 // 2, by - tl, cx + sw2 // 2, by], outline=0, width=1)
+        d.rectangle([cx - sw2 // 2, by - tl, cx + sw2 // 2, by], outline=0, width=2)
         d.line([(cx - sw2 // 2, by - tl + 1), (cx + sw2 // 2, by - 1)], fill=0, width=1)
     if 'M-M' in st:
-        d.rectangle([cx - sw2 // 2, by + bh, cx + sw2 // 2, by + bh + tl], outline=0, width=1)
+        d.rectangle([cx - sw2 // 2, by + bh, cx + sw2 // 2, by + bh + tl], outline=0, width=2)
         d.line([(cx - sw2 // 2, by + bh + 1), (cx + sw2 // 2, by + bh + tl - 1)], fill=0, width=1)
 
 
@@ -1262,12 +1264,16 @@ def _sv_rivet(d, specs, x, y, w, h):
     hx1, hx2 = cx - hw // 2, cx + hw // 2
     sx1, sx2 = cx - rw // 2, cx + rw // 2
     if ht == 'Dome':
-        d.pieslice([hx1, y - hh, hx2, y + hh], 180, 360, fill=0, outline=0)
+        # Arc 180°→360° = upper half; bbox starts at y so chord lands at y+hh
+        # (exactly where the stem starts), dome peak at y.
+        d.arc([hx1, y, hx2, y + hh * 2], 180, 360, fill=0, width=2)
+        d.line([(hx1, y + hh), (hx2, y + hh)], fill=0, width=2)
     elif ht in ('Countersunk', 'Flat'):
-        d.polygon([(hx1, y + hh), (hx2, y + hh), (sx2, y), (sx1, y)], outline=0)
+        # Trapezoid: wide at top (y), narrows to stem width at y+hh
+        d.polygon([(hx1, y), (hx2, y), (sx2, y + hh), (sx1, y + hh)], outline=0)
     else:
-        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=1)
-    d.rectangle([sx1, y + hh, sx2, y + hh + sh], outline=0, width=1)
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
+    d.rectangle([sx1, y + hh, sx2, y + hh + sh], outline=0, width=2)
     if rt == 'Blind/Pop':
         mr = max(1, rw // 4)
         d.rectangle([cx - mr, y, cx + mr, y + hh + sh + 3], fill=0)
@@ -1276,9 +1282,9 @@ def _sv_rivet(d, specs, x, y, w, h):
 def _sv_pin(d, specs, x, y, w, h):
     cx = x + w // 2
     r = max(3, min(w, h) // 2 - 3)
-    d.rectangle([cx - r, y + 2, cx + r, y + h - 2], outline=0, width=1)
+    d.rectangle([cx - r, y + 2, cx + r, y + h - 2], outline=0, width=2)
     if specs.get('pin_type', '') in ('Roll Pin (Spring)', 'Slotted'):
-        d.line([(cx, y + 2), (cx, y + h - 2)], fill=0, width=1)
+        d.line([(cx, y + 2), (cx, y + h - 2)], fill=0, width=2)
 
 
 def _sv_circlip(d, specs, x, y, w, h):
@@ -1288,10 +1294,10 @@ def _sv_circlip(d, specs, x, y, w, h):
     sy = y + (h - t) // 2
     gp = max(3, int(ro * 0.25))
     gx = cx - gp // 2
-    d.rectangle([cx - ro, sy, cx + ro, sy + t], outline=0, width=1)
+    d.rectangle([cx - ro, sy, cx + ro, sy + t], outline=0, width=2)
     d.rectangle([gx, sy - 1, gx + gp, sy + t + 1], fill='white')
-    d.line([(gx, sy), (gx, sy + t)], fill=0, width=1)
-    d.line([(gx + gp, sy), (gx + gp, sy + t)], fill=0, width=1)
+    d.line([(gx, sy), (gx, sy + t)], fill=0, width=2)
+    d.line([(gx + gp, sy), (gx + gp, sy + t)], fill=0, width=2)
 
 
 def _sv_insert(d, specs, x, y, w, h):
@@ -1300,13 +1306,13 @@ def _sv_insert(d, specs, x, y, w, h):
     bh = int(h * 0.70)
     by = y + (h - bh) // 2
     hr = max(2, int(r * 0.35))
-    d.rectangle([cx - r, by, cx + r, by + bh], outline=0, width=1)
-    d.line([(cx - hr, by), (cx - hr, by + bh)], fill=0, width=1)
-    d.line([(cx + hr, by), (cx + hr, by + bh)], fill=0, width=1)
+    d.rectangle([cx - r, by, cx + r, by + bh], outline=0, width=2)
+    d.line([(cx - hr, by), (cx - hr, by + bh)], fill=0, width=2)
+    d.line([(cx + hr, by), (cx + hr, by + bh)], fill=0, width=2)
     for i in range(1, 4):
         ky = by + bh * i // 4
-        d.line([(cx - r, ky), (cx - r - 2, ky + 2)], fill=0, width=1)
-        d.line([(cx + r, ky), (cx + r + 2, ky + 2)], fill=0, width=1)
+        d.line([(cx - r, ky), (cx - r - 2, ky + 2)], fill=0, width=2)
+        d.line([(cx + r, ky), (cx + r + 2, ky + 2)], fill=0, width=2)
 
 
 _HW_TV = {
