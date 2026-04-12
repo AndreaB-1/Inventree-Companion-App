@@ -785,10 +785,17 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
         <div class="card-header"><h2>Label Options</h2><span class="badge">12 mm tape</span></div>
         <div class="grid-2" style="gap:12px;margin-bottom:14px">
           <div class="field">
-            <label>Label Length (mm)</label>
-            <input type="number" id="hwLabelLength" value="36" min="12" max="200" step="1">
-            <div class="field-hint">Tape width is fixed at 12 mm</div>
+            <label>Total Tape Length (mm)</label>
+            <input type="number" id="hwLabelLength" value="36" min="12" max="200" step="1" oninput="hwUpdateTapeHint()">
+            <div class="field-hint" id="hwTapeHint">Content area: 36 mm</div>
           </div>
+          <div class="field">
+            <label>Cut Margin (mm per side)</label>
+            <input type="number" id="hwCutMargin" value="0" min="0" max="15" step="0.5" oninput="hwUpdateTapeHint()">
+            <div class="field-hint">Printer dead zone each end — set to 3 for QL-710W</div>
+          </div>
+        </div>
+        <div class="grid-2" style="gap:12px;margin-bottom:14px">
           <div class="field">
             <label>Copies</label>
             <input type="number" id="hwCopies" value="1" min="1" max="99" step="1">
@@ -803,13 +810,78 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
           <label class="lbl-checkbox"><input type="checkbox" id="hwOptGrade" checked> Show grade</label>
         </div>
         <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-          <label class="lbl-checkbox"><input type="checkbox" id="hwOptQR" onchange="document.getElementById('hwQRDataRow').style.display=this.checked?'':'none'"> Show QR code</label>
+          <label class="lbl-checkbox"><input type="checkbox" id="hwOptQR" onchange="hwOnQRToggle(this.checked)"> Show QR code</label>
           <div id="hwQRDataRow" style="display:none;margin-top:10px">
-            <div class="field">
-              <label>QR Code Data / URL</label>
-              <input type="text" id="hwQRData" placeholder="e.g. https://inventree.local/part/42/ or free text">
-              <div class="field-hint">Text or URL to encode in the QR code on the left side of the label</div>
+
+            <!-- Mode tabs -->
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <button class="btn sm primary" id="hwQRBtnSearch" onclick="hwQRSetMode('search')">🔍 Link Existing Part</button>
+              <button class="btn sm" id="hwQRBtnCreate" onclick="hwQRSetMode('create')">➕ Create New Part</button>
             </div>
+
+            <!-- Currently linked part pill -->
+            <div id="hwQRLinked" style="display:none;margin-bottom:10px;padding:6px 10px;background:var(--bg-2);border-radius:6px;font-size:12px;display:none">
+              <span>✅ Linked: <strong id="hwQRLinkedName"></strong> <span style="color:var(--text-3)">(ID: <span id="hwQRLinkedId"></span>)</span></span>
+              <button onclick="hwQRClear()" style="float:right;background:none;border:none;cursor:pointer;color:var(--text-3);font-size:11px;padding:0">✕ Clear</button>
+            </div>
+
+            <!-- SEARCH panel -->
+            <div id="hwQRSearchPanel">
+              <div class="field dropdown" id="hwPartSearchWrap">
+                <label>Search InvenTree part</label>
+                <input type="text" id="hwPartSearchInput" placeholder="Type part name or IPN…" autocomplete="off">
+                <div id="hwPartSearchList" class="dropdown-list"></div>
+                <div class="field-hint">Select a part to encode {"part": id} in the QR code</div>
+              </div>
+            </div>
+
+            <!-- CREATE panel -->
+            <div id="hwQRCreatePanel" style="display:none">
+              <div class="grid-2" style="gap:10px;margin-bottom:10px">
+                <div class="field">
+                  <label>Part Name</label>
+                  <input type="text" id="hwNewName" placeholder="e.g. M5×8 Button Head Screw A2">
+                </div>
+                <div class="field">
+                  <label>IPN (optional)</label>
+                  <input type="text" id="hwNewIPN" placeholder="Internal Part Number">
+                </div>
+              </div>
+              <div class="field" style="margin-bottom:10px">
+                <label>Description</label>
+                <textarea id="hwNewDesc" rows="2" placeholder="Full description…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
+              </div>
+              <div class="grid-2" style="gap:10px;margin-bottom:10px">
+                <div class="field">
+                  <label>Initial Qty</label>
+                  <input type="number" id="hwNewQty" placeholder="0" min="0" step="1">
+                </div>
+                <div class="field dropdown" id="hwNewLocWrap">
+                  <label>Location</label>
+                  <input type="text" id="hwNewLocSearch" placeholder="Type to search…" autocomplete="off">
+                  <div id="hwNewLocList" class="dropdown-list"></div>
+                  <input type="hidden" id="hwNewLocId">
+                </div>
+              </div>
+              <div style="margin-bottom:10px">
+                <label style="font-size:12px;font-weight:600;color:var(--text-2);display:block;margin-bottom:6px">Part Image</label>
+                <div class="grid-2" style="gap:10px">
+                  <div class="field">
+                    <label>Upload file / camera</label>
+                    <input type="file" id="hwNewImage" accept="image/*" capture="environment">
+                  </div>
+                  <div class="field" style="display:flex;align-items:flex-end">
+                    <button class="btn sm" onclick="hwNewPartImageSearch()">🔍 Search online</button>
+                  </div>
+                </div>
+              </div>
+              <div class="btn-row" style="flex-wrap:wrap;gap:6px">
+                <button class="btn sm" onclick="hwAutoFillQRCreate()" title="Overwrite fields with values from the spec form above">♻ Auto-fill from specs</button>
+                <button class="btn primary" onclick="hwCreateAndLinkPart()">✅ Create &amp; Link QR</button>
+                <div class="status-line" id="hwCreatePartStatus"></div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -1877,6 +1949,10 @@ async function initLabelsPage(){
   // Restore saved printer
   const saved=localStorage.getItem('hw_label_printer');
   if(saved)document.getElementById('hwPrinterAddr').value=saved;
+  // Restore saved cut margin and update hint
+  const savedMargin=localStorage.getItem('hw_cut_margin');
+  if(savedMargin!==null)document.getElementById('hwCutMargin').value=savedMargin;
+  hwUpdateTapeHint();
   // Select default type
   hwSelectType('screw');
 }
@@ -2020,6 +2096,19 @@ function hwCollectSpecs(){
   return specs;
 }
 
+function hwUpdateTapeHint(){
+  const len=parseFloat(document.getElementById('hwLabelLength').value)||36;
+  const margin=parseFloat(document.getElementById('hwCutMargin').value)||0;
+  const content=Math.max(5,len-2*margin);
+  const hint=document.getElementById('hwTapeHint');
+  if(margin>0){
+    hint.textContent=`Content area: ${content.toFixed(1)} mm  (${margin} mm margin each end)`;
+  }else{
+    hint.textContent=`Content area: ${len} mm  (no cut margin set)`;
+  }
+  localStorage.setItem('hw_cut_margin',margin);
+}
+
 function hwCollectOptions(){
   return{
     show_diagram:document.getElementById('hwOptDiagram').checked,
@@ -2029,7 +2118,8 @@ function hwCollectOptions(){
     show_standard:document.getElementById('hwOptStandard').checked,
     show_grade:document.getElementById('hwOptGrade').checked,
     show_qr:document.getElementById('hwOptQR').checked,
-    qr_data:(document.getElementById('hwQRData').value||'').trim(),
+    qr_data:_hwQRPartId ? JSON.stringify({part:parseInt(_hwQRPartId,10)}) : '',
+    cut_margin_mm_per_side:parseFloat(document.getElementById('hwCutMargin').value)||0,
   };
 }
 
