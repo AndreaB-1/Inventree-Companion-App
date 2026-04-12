@@ -398,6 +398,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
         <span class="ni-icon">🏷️</span>
         <span class="ni-label">Label Printer</span>
       </button>
+      <button id="nav-config" class="nav-item" onclick="showPage('config')">
+        <span class="ni-icon">⚙️</span>
+        <span class="ni-label">Label Config</span>
+      </button>
 
       <div class="sidebar-footer">
         <div class="server-badge">Server: <code>:8000</code></div>
@@ -857,6 +861,122 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       </div>
     </section>
 
+    <!-- ══════════════ LABEL CONFIG ══════════════ -->
+    <section id="page-config" class="page">
+      <div class="page-header">
+        <h2>⚙️ Label Config</h2>
+        <p>Customise thread sizes, hardware standards and materials used throughout the label printer.</p>
+      </div>
+
+      <!-- Tab bar -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn sm primary" id="cfgTabSizes"   onclick="cfgShowTab('sizes')"    >📏 Sizes</button>
+        <button class="btn sm"         id="cfgTabStandards" onclick="cfgShowTab('standards')">📋 Standards</button>
+        <button class="btn sm"         id="cfgTabMaterials" onclick="cfgShowTab('materials')">🧪 Materials</button>
+      </div>
+
+      <!-- ── Sizes tab ── -->
+      <div id="cfgPaneSizes">
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-header">Metric Sizes</div>
+          <div class="card-body">
+            <div id="cfgMetricList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="cfgNewMetric" placeholder="e.g. M5.5" style="width:110px">
+              <button class="btn sm primary" onclick="cfgAddSize('metric')">+ Add</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-header">Imperial Sizes</div>
+          <div class="card-body">
+            <div id="cfgImperialList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="cfgNewImperial" placeholder='e.g. 3/8"-16' style="width:130px">
+              <button class="btn sm primary" onclick="cfgAddSize('imperial')">+ Add</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Custom Sizes</div>
+          <div class="card-body">
+            <div id="cfgCustomList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="cfgNewCustom" placeholder="e.g. TR10" style="width:130px">
+              <button class="btn sm primary" onclick="cfgAddSize('custom')">+ Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Standards tab ── -->
+      <div id="cfgPaneStandards" style="display:none">
+        <div class="card">
+          <div class="card-header">Hardware Standards</div>
+          <div class="card-body">
+            <!-- Filter bar -->
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+              <label style="font-weight:600;font-size:13px">Filter type:</label>
+              <select id="cfgStdFilter" onchange="cfgRenderStandards()" style="width:150px">
+                <option value="">All</option>
+                <option value="screw">Screw</option>
+                <option value="nut">Nut</option>
+                <option value="washer">Washer</option>
+                <option value="standoff">Standoff</option>
+                <option value="rivet">Rivet</option>
+              </select>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px" id="cfgStdTable">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border)">
+                  <th style="text-align:left;padding:4px 8px">Standard</th>
+                  <th style="text-align:left;padding:4px 8px">Type</th>
+                  <th style="text-align:left;padding:4px 8px">Description</th>
+                  <th style="padding:4px 8px"></th>
+                </tr>
+              </thead>
+              <tbody id="cfgStdBody"></tbody>
+            </table>
+            <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <input type="text" id="cfgNewStdName" placeholder="Standard name" style="width:130px">
+              <select id="cfgNewStdType" style="width:110px">
+                <option value="screw">Screw</option>
+                <option value="nut">Nut</option>
+                <option value="washer">Washer</option>
+                <option value="standoff">Standoff</option>
+                <option value="rivet">Rivet</option>
+                <option value="pin">Pin</option>
+                <option value="circlip">Circlip</option>
+                <option value="insert">Insert</option>
+              </select>
+              <input type="text" id="cfgNewStdDesc" placeholder="Description (optional)" style="flex:1;min-width:140px">
+              <button class="btn sm primary" onclick="cfgAddStandard()">+ Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Materials tab ── -->
+      <div id="cfgPaneMaterials" style="display:none">
+        <div class="card">
+          <div class="card-header">Materials</div>
+          <div class="card-body">
+            <div id="cfgMaterialList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="cfgNewMaterial" placeholder="e.g. Inconel 625" style="flex:1;max-width:280px">
+              <button class="btn sm primary" onclick="cfgAddMaterial()">+ Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn primary" onclick="cfgSave()">💾 Save Changes</button>
+        <button class="btn" onclick="cfgReset()">↺ Reset to Defaults</button>
+        <div class="status-line" id="cfgStatus" style="display:inline-block;margin-left:12px"></div>
+      </div>
+    </section>
+
   </div>
 </div>
 
@@ -920,13 +1040,14 @@ backdrop.onclick=()=>{sidebar.classList.remove('open');backdrop.classList.remove
 
 // PAGES
 function showPage(id){
-  ['add','kiosk','search','standards','edit','labels'].forEach(p=>{
+  ['add','kiosk','search','standards','edit','labels','config'].forEach(p=>{
     document.getElementById('page-'+p).classList.toggle('active',p===id);
     document.getElementById('nav-'+p).classList.toggle('active',p===id);
   });
   sidebar.classList.remove('open');backdrop.classList.remove('show');
   if(id==='search')ensureSearchInitialized();
   if(id==='labels')initLabelsPage();
+  if(id==='config')initConfigPage();
 }
 
 // HTTP
@@ -1616,22 +1737,37 @@ document.getElementById('btnStdAcceptAll').onclick=stdAcceptAll;
 // ══════════════ LABEL PRINTER ══════════════
 
 const METRIC_DIMS={
+  'M1':  {pitch:0.25,af:2.5, nut_h:0.8, w_id:1.1, w_od:3.0,  w_t:0.3},
+  'M1.2':{pitch:0.25,af:3.0, nut_h:1.0, w_id:1.3, w_od:3.5,  w_t:0.3},
+  'M1.4':{pitch:0.30,af:3.0, nut_h:1.2, w_id:1.5, w_od:3.5,  w_t:0.3},
+  'M1.6':{pitch:0.35,af:3.2, nut_h:1.3, w_id:1.7, w_od:4.0,  w_t:0.3},
   'M2':  {pitch:0.40,af:4.0, nut_h:1.6, w_id:2.2, w_od:5.0,  w_t:0.3},
   'M2.5':{pitch:0.45,af:5.0, nut_h:2.0, w_id:2.7, w_od:6.0,  w_t:0.5},
   'M3':  {pitch:0.50,af:5.5, nut_h:2.4, w_id:3.2, w_od:7.0,  w_t:0.5},
+  'M3.5':{pitch:0.60,af:6.0, nut_h:2.8, w_id:3.7, w_od:8.0,  w_t:0.5},
   'M4':  {pitch:0.70,af:7.0, nut_h:3.2, w_id:4.3, w_od:9.0,  w_t:0.8},
   'M5':  {pitch:0.80,af:8.0, nut_h:4.7, w_id:5.3, w_od:10.0, w_t:1.0},
   'M6':  {pitch:1.00,af:10.0,nut_h:5.2, w_id:6.4, w_od:12.0, w_t:1.6},
+  'M7':  {pitch:1.00,af:11.0,nut_h:5.5, w_id:7.4, w_od:14.0, w_t:1.6},
   'M8':  {pitch:1.25,af:13.0,nut_h:6.8, w_id:8.4, w_od:16.0, w_t:1.6},
   'M10': {pitch:1.50,af:17.0,nut_h:8.4, w_id:10.5,w_od:20.0, w_t:2.0},
   'M12': {pitch:1.75,af:19.0,nut_h:10.8,w_id:13.0,w_od:24.0, w_t:2.5},
+  'M14': {pitch:2.00,af:22.0,nut_h:12.8,w_id:15.0,w_od:28.0, w_t:2.5},
   'M16': {pitch:2.00,af:24.0,nut_h:14.8,w_id:17.0,w_od:30.0, w_t:3.0},
+  'M18': {pitch:2.50,af:27.0,nut_h:15.0,w_id:19.0,w_od:34.0, w_t:3.0},
   'M20': {pitch:2.50,af:30.0,nut_h:18.0,w_id:21.0,w_od:37.0, w_t:3.0},
+  'M22': {pitch:2.50,af:32.0,nut_h:17.5,w_id:23.0,w_od:39.0, w_t:3.0},
   'M24': {pitch:3.00,af:36.0,nut_h:21.5,w_id:25.0,w_od:44.0, w_t:4.0},
+  'M27': {pitch:3.00,af:41.0,nut_h:22.5,w_id:28.0,w_od:50.0, w_t:4.0},
+  'M30': {pitch:3.50,af:46.0,nut_h:24.0,w_id:31.0,w_od:56.0, w_t:4.0},
+  'M36': {pitch:4.00,af:55.0,nut_h:29.4,w_id:37.0,w_od:66.0, w_t:5.0},
+  'M42': {pitch:4.50,af:65.0,nut_h:34.0,w_id:43.0,w_od:78.0, w_t:6.0},
+  'M48': {pitch:5.00,af:75.0,nut_h:38.0,w_id:50.0,w_od:92.0, w_t:6.0},
 };
 
-const THREAD_SIZES=['M2','M2.5','M3','M4','M5','M6','M8','M10','M12','M16','M20','M24'];
-const MATERIALS=['A2-304 Stainless','A4-316 Stainless','Carbon Steel','Alloy Steel','Zinc Plated','Black Oxide','Brass','Nylon','Titanium'];
+// Default/fallback lists — overridden at runtime by hwGetThreadSizes() / hwGetMaterials()
+const THREAD_SIZES=['M1','M1.2','M1.4','M1.6','M2','M2.5','M3','M3.5','M4','M5','M6','M7','M8','M10','M12','M14','M16','M18','M20','M22','M24','M27','M30','M36','M42','M48'];
+const MATERIALS=['A2-304 Stainless','A4-316 Stainless','Carbon Steel','Alloy Steel','High Tensile Steel (Grade 8.8)','High Tensile Steel (Grade 10.9)','High Tensile Steel (Grade 12.9)','Zinc Plated Steel','Hot-Dip Galvanised Steel','Black Oxide Steel','Brass','Aluminium','Titanium Grade 2','Nylon (PA66)','PTFE'];
 
 const HW_TYPES={
   screw:{label:'Screw / Bolt',icon:'🔩',fields:[
@@ -1701,10 +1837,33 @@ const HW_TYPES={
 let _hwCurrentType='screw';
 let _hwLabelB64=null;
 let _hwLabelsInited=false;
+let _hwQRPartId=null;       // pk of the InvenTree part linked to the QR code
+let _hwQRSectionInited=false;
+let _hwConfig=null;         // loaded from /api/config/hardware
 
-function initLabelsPage(){
+// ── Config helpers ────────────────────────────────────────────────────────────
+function hwGetThreadSizes(){
+  if(!_hwConfig) return THREAD_SIZES;
+  const ts=_hwConfig.thread_sizes||{};
+  return [...(ts.metric||[]),...(ts.imperial||[]),...(ts.custom||[])];
+}
+function hwGetMaterials(){
+  return (_hwConfig&&_hwConfig.materials&&_hwConfig.materials.length)
+         ? _hwConfig.materials : MATERIALS;
+}
+function hwGetStandardsForType(type){
+  if(!_hwConfig||!_hwConfig.standards) return [];
+  return _hwConfig.standards.filter(s=>s.type===type||!s.type).map(s=>s.name);
+}
+async function hwLoadConfig(){
+  try{ _hwConfig=await apiGET('/api/config/hardware'); }catch(e){ _hwConfig=null; }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function initLabelsPage(){
   if(_hwLabelsInited)return;
   _hwLabelsInited=true;
+  await hwLoadConfig();
   // Build type grid
   const grid=document.getElementById('hwTypeGrid');
   Object.entries(HW_TYPES).forEach(([key,def])=>{
@@ -1742,6 +1901,9 @@ function hwBuildSpecForm(type){
   const grid=document.createElement('div');
   grid.className='grid-2';
   grid.style.gap='12px';
+  const dynamicThreadSizes=hwGetThreadSizes();
+  const dynamicMaterials=hwGetMaterials();
+  const dynamicStandards=hwGetStandardsForType(type);
   def.fields.forEach(f=>{
     const wrap=document.createElement('div');
     wrap.className='field';
@@ -1752,7 +1914,12 @@ function hwBuildSpecForm(type){
     if(f.type==='select'){
       inp=document.createElement('select');
       inp.id='hwf_'+f.id;
-      f.opts.forEach(o=>{
+      // Use dynamic lists for thread sizes, materials and standards
+      let opts=f.opts;
+      if(f.id==='thread_size'||f.id==='fits_size') opts=dynamicThreadSizes;
+      else if(f.id==='material') opts=dynamicMaterials;
+      else if(f.id==='standard'&&dynamicStandards.length) opts=dynamicStandards;
+      opts.forEach(o=>{
         const opt=document.createElement('option');
         opt.value=o;opt.textContent=o;
         if(o===f.def)opt.selected=true;
@@ -1783,6 +1950,48 @@ function hwBuildSpecForm(type){
   if(sizeEl){
     sizeEl.addEventListener('change',()=>hwAutoFill(type,sizeEl.value));
     hwAutoFill(type,sizeEl.value);
+  }
+  // Auto-fill from standard selection
+  const stdEl=document.getElementById('hwf_standard');
+  if(stdEl) stdEl.addEventListener('change',()=>hwApplyStandardAutoFill(type,stdEl.value));
+}
+
+function hwApplyStandardAutoFill(type,standard){
+  // Fill head type / drive based on known standards
+  const headEl=document.getElementById('hwf_head_type');
+  const driveEl=document.getElementById('hwf_drive');
+  if(!headEl&&!driveEl)return;
+  const map={
+    'DIN 912':    {head:'Socket Cap',   drive:'Hex (Allen)'},
+    'ISO 4762':   {head:'Socket Cap',   drive:'Hex (Allen)'},
+    'DIN 7984':   {head:'Socket Cap',   drive:'Hex (Allen)'},
+    'ISO 7380-1': {head:'Button',       drive:'Hex (Allen)'},
+    'ISO 7380-2': {head:'Button',       drive:'Hex (Allen)'},
+    'DIN 7985':   {head:'Pan',          drive:'Phillips'},
+    'ISO 7045':   {head:'Pan',          drive:'Phillips'},
+    'DIN 965':    {head:'Countersunk',  drive:'Phillips'},
+    'ISO 10642':  {head:'Countersunk',  drive:'Hex (Allen)'},
+    'DIN 7991':   {head:'Countersunk',  drive:'Hex (Allen)'},
+    'DIN 933':    {head:'Hex',          drive:'None'},
+    'DIN 931':    {head:'Hex',          drive:'None'},
+    'ISO 4017':   {head:'Hex',          drive:'None'},
+    'ASME B18.3': {head:'Socket Cap',   drive:'Hex (Allen)'},
+    'ASME B18.2.1':{head:'Hex',         drive:'None'},
+    'ASME B18.6.3':{head:'Pan',         drive:'Phillips'},
+    'ISO 1207':   {head:'Pan',          drive:'Slotted'},
+    'DIN 84':     {head:'Pan',          drive:'Slotted'},
+    'DIN 7981':   {head:'Pan',          drive:'Phillips'},
+    'DIN 7982':   {head:'Countersunk',  drive:'Phillips'},
+    'ISO 14585':  {head:'Pan',          drive:'Torx'},
+    'ISO 14586':  {head:'Countersunk',  drive:'Torx'},
+  };
+  const fill=map[standard];
+  if(!fill)return;
+  if(headEl&&fill.head){
+    [...headEl.options].forEach(o=>{if(o.value===fill.head)o.selected=true;});
+  }
+  if(driveEl&&fill.drive){
+    [...driveEl.options].forEach(o=>{if(o.value===fill.drive)o.selected=true;});
   }
 }
 
@@ -1909,6 +2118,385 @@ function hwDownloadLabel(){
   const sz=specs.thread_size||specs.fits_size||specs.diameter_mm||specs.shaft_diameter_mm||'';
   a.download=`label_${type}_${sz}.png`.replace(/\s+/g,'_');
   a.click();
+}
+
+// ── QR / Part linking ──────────────────────────────────────────────
+
+function hwOnQRToggle(checked){
+  document.getElementById('hwQRDataRow').style.display=checked?'':'none';
+  if(checked) hwInitQRSection();
+}
+
+function hwInitQRSection(){
+  if(_hwQRSectionInited)return;
+  _hwQRSectionInited=true;
+  // Part search typeahead
+  attachTypeahead({
+    inputEl:document.getElementById('hwPartSearchInput'),
+    listEl:document.getElementById('hwPartSearchList'),
+    onQuery:async(q)=>{
+      const res=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=10');
+      return res.map(p=>({pk:p.pk,label:p.name+(p.ipn?' ['+p.ipn+']':'')}));
+    },
+    onPick:(item)=>{
+      _hwQRPartId=item.pk;
+      document.getElementById('hwQRLinkedName').textContent=item.label;
+      document.getElementById('hwQRLinkedId').textContent=item.pk;
+      document.getElementById('hwQRLinked').style.display='';
+      document.getElementById('hwPartSearchInput').value='';
+    }
+  });
+  // Location typeahead for new-part form
+  attachTypeahead({
+    inputEl:document.getElementById('hwNewLocSearch'),
+    listEl:document.getElementById('hwNewLocList'),
+    onQuery:async(q)=>{
+      const res=await apiGET('/api/locations?q='+encodeURIComponent(q)+'&limit=12');
+      return res.map(l=>({pk:l.pk,label:l.pathstring||l.name}));
+    },
+    onPick:(item)=>{
+      document.getElementById('hwNewLocId').value=item.pk;
+      document.getElementById('hwNewLocSearch').value=item.label;
+    }
+  });
+}
+
+function hwQRSetMode(mode){
+  const isSearch=mode==='search';
+  document.getElementById('hwQRSearchPanel').style.display=isSearch?'':'none';
+  document.getElementById('hwQRCreatePanel').style.display=isSearch?'none':'';
+  document.getElementById('hwQRBtnSearch').className='btn sm'+(isSearch?' primary':'');
+  document.getElementById('hwQRBtnCreate').className='btn sm'+(isSearch?'':' primary');
+  if(!isSearch) hwAutoFillQRCreate();
+}
+
+function hwQRClear(){
+  _hwQRPartId=null;
+  document.getElementById('hwQRLinked').style.display='none';
+  document.getElementById('hwPartSearchInput').value='';
+}
+
+// ── Suggested name / description from current specs ────────────────
+
+function hwSuggestName(){
+  const t=_hwCurrentType; if(!t)return'';
+  const s=hwCollectSpecs();
+  if(t==='screw'){
+    const sz=(s.thread_size||'')+(s.length_mm?'×'+s.length_mm:'');
+    return[sz,s.head_type,'Screw',s.material].filter(Boolean).join(' ');
+  }
+  if(t==='nut')  return[s.thread_size,s.nut_type,'Nut',s.material].filter(Boolean).join(' ');
+  if(t==='washer')return[s.fits_size,s.washer_type,'Washer',s.material].filter(Boolean).join(' ');
+  if(t==='standoff'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.standoff_type,'Standoff',s.body_material].filter(Boolean).join(' ');
+  }
+  if(t==='rivet'){
+    const dia=s.diameter_mm?'Ø'+s.diameter_mm+'mm':'';
+    return[dia,s.rivet_type,'Rivet',s.material].filter(Boolean).join(' ');
+  }
+  if(t==='pin'){
+    const sz=(s.diameter_mm&&s.length_mm)?'Ø'+s.diameter_mm+'×'+s.length_mm+'mm':(s.diameter_mm?'Ø'+s.diameter_mm+'mm':'');
+    return[sz,s.pin_type,s.material].filter(Boolean).join(' ');
+  }
+  if(t==='circlip'){
+    const dia=s.shaft_diameter_mm?'Ø'+s.shaft_diameter_mm+'mm':'';
+    return[dia,s.circlip_type,'Circlip',s.material].filter(Boolean).join(' ');
+  }
+  if(t==='insert'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.install_method,'Insert',s.material].filter(Boolean).join(' ');
+  }
+  return t.charAt(0).toUpperCase()+t.slice(1);
+}
+
+function hwSuggestDesc(){
+  const t=_hwCurrentType; if(!t)return'';
+  const s=hwCollectSpecs();
+  if(t==='screw'){
+    const sz=(s.thread_size||'')+(s.length_mm?'×'+s.length_mm:'')+(s.pitch_mm?' p'+s.pitch_mm:'');
+    return[sz,s.head_type,s.drive,'Screw',s.standard,(s.material||'')+(s.grade?' '+s.grade:'')].filter(Boolean).join(' – ');
+  }
+  if(t==='nut'){
+    const sz=(s.thread_size||'')+(s.pitch_mm?' p'+s.pitch_mm:'');
+    return[sz,s.nut_type,'Nut',s.standard,(s.material||'')+(s.grade?' '+s.grade:'')].filter(Boolean).join(' – ');
+  }
+  if(t==='washer')
+    return[s.fits_size,s.washer_type,'Washer',s.standard,s.material].filter(Boolean).join(' – ');
+  if(t==='standoff'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.standoff_type,'Standoff',s.body_material].filter(Boolean).join(' – ');
+  }
+  if(t==='rivet'){
+    const dia=s.diameter_mm?'Ø'+s.diameter_mm+'mm':'';
+    const grip=(s.grip_min||s.grip_max)?'grip '+(s.grip_min||'')+'–'+(s.grip_max||'')+'mm':'';
+    return[dia,s.rivet_type,'Rivet',grip,s.material].filter(Boolean).join(' – ');
+  }
+  if(t==='pin'){
+    const sz=(s.diameter_mm&&s.length_mm)?'Ø'+s.diameter_mm+'×'+s.length_mm+'mm':(s.diameter_mm?'Ø'+s.diameter_mm+'mm':'');
+    return[sz,s.pin_type,s.tolerance,s.material].filter(Boolean).join(' – ');
+  }
+  if(t==='circlip'){
+    const dia=s.shaft_diameter_mm?'Ø'+s.shaft_diameter_mm+'mm':'';
+    return[dia,s.circlip_type,'Circlip',s.material].filter(Boolean).join(' – ');
+  }
+  if(t==='insert'){
+    const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
+    return[sz,s.install_method,'Thread Insert',s.material].filter(Boolean).join(' – ');
+  }
+  return'';
+}
+
+function hwAutoFillQRCreate(){
+  document.getElementById('hwNewName').value=hwSuggestName();
+  document.getElementById('hwNewDesc').value=hwSuggestDesc();
+}
+
+// ── Create part and link QR ────────────────────────────────────────
+
+async function hwCreateAndLinkPart(){
+  const name=document.getElementById('hwNewName').value.trim();
+  const st=document.getElementById('hwCreatePartStatus');
+  if(!name){setStatus(st,'Name is required','err');return;}
+  const desc=document.getElementById('hwNewDesc').value.trim();
+  const ipn=document.getElementById('hwNewIPN').value.trim();
+  const qty=document.getElementById('hwNewQty').value.trim();
+  const locId=document.getElementById('hwNewLocId').value.trim();
+  setStatus(st,'Creating part…','loading');
+  try{
+    const fd=new FormData();
+    fd.append('name',name);
+    if(desc)fd.append('description',desc);
+    if(ipn)fd.append('ipn',ipn);
+    if(qty)fd.append('initial_qty',qty);
+    if(qty&&locId)fd.append('location_id',locId);
+    const r=await fetch('/api/part/create',{method:'POST',body:fd});
+    const j=await r.json();
+    if(!r.ok){setStatus(st,'❌ '+(j.detail||'Failed'),'err');return;}
+    // Link QR to the new part
+    _hwQRPartId=j.pk;
+    document.getElementById('hwQRLinkedName').textContent=j.name;
+    document.getElementById('hwQRLinkedId').textContent=j.pk;
+    document.getElementById('hwQRLinked').style.display='';
+    setStatus(st,'✅ Created: '+j.name+' (ID: '+j.pk+')','ok');
+    // Upload image file if one was chosen
+    const imgFile=document.getElementById('hwNewImage').files[0];
+    if(imgFile){
+      const imgFd=new FormData();
+      imgFd.append('part_id',j.pk);
+      imgFd.append('image',imgFile);
+      fetch('/api/upload',{method:'POST',body:imgFd});
+    }else{
+      // Auto-suggest internet images (same flow as main create page)
+      const q=[name,desc].filter(Boolean).join(' ');
+      apiPOST('/api/part/image-search',{query:q})
+        .then(res=>{if(res.images?.length)openImgSuggestModal(res.images,j.pk);})
+        .catch(()=>{});
+    }
+  }catch(e){setStatus(st,'❌ '+e.message,'err');}
+}
+
+async function hwNewPartImageSearch(){
+  const name=document.getElementById('hwNewName').value.trim();
+  const desc=document.getElementById('hwNewDesc').value.trim();
+  const q=[name,desc].filter(Boolean).join(' ');
+  const st=document.getElementById('hwCreatePartStatus');
+  if(!q){setStatus(st,'Enter a name first','err');return;}
+  if(!_hwQRPartId){setStatus(st,'Create the part first, then search for images','err');return;}
+  setStatus(st,'Searching…','loading');
+  try{
+    const res=await apiPOST('/api/part/image-search',{query:q});
+    if(res.images?.length)openImgSuggestModal(res.images,_hwQRPartId);
+    setStatus(st,'','ok');
+  }catch(e){setStatus(st,'❌ '+e.message,'err');}
+}
+
+// ══════════════ LABEL CONFIG PAGE ══════════════
+
+let _cfgData=null;          // working copy of the config being edited
+let _cfgInited=false;
+
+async function initConfigPage(){
+  if(_cfgInited)return;
+  _cfgInited=true;
+  cfgShowTab('sizes');
+  await cfgLoad();
+}
+
+async function cfgLoad(){
+  try{
+    _cfgData=JSON.parse(JSON.stringify(await apiGET('/api/config/hardware')));
+    cfgRenderAll();
+    setStatus(document.getElementById('cfgStatus'),'','');
+  }catch(e){
+    setStatus(document.getElementById('cfgStatus'),'⚠ Could not load config: '+e.message,'err');
+  }
+}
+
+function cfgRenderAll(){
+  cfgRenderSizes();
+  cfgRenderStandards();
+  cfgRenderMaterials();
+}
+
+function cfgShowTab(tab){
+  ['sizes','standards','materials'].forEach(t=>{
+    document.getElementById('cfgPane'+t.charAt(0).toUpperCase()+t.slice(1)).style.display=(t===tab?'':'none');
+    const btn=document.getElementById('cfgTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(btn){btn.className='btn sm'+(t===tab?' primary':'');}
+  });
+}
+
+// ── Sizes ──────────────────────────────────────────────────────────
+function cfgRenderSizes(){
+  if(!_cfgData)return;
+  const ts=_cfgData.thread_sizes||{metric:[],imperial:[],custom:[]};
+  _cfgRenderPillList('cfgMetricList',  ts.metric||[],  'metric');
+  _cfgRenderPillList('cfgImperialList',ts.imperial||[],'imperial');
+  _cfgRenderPillList('cfgCustomList',  ts.custom||[],  'custom');
+}
+
+function _cfgRenderPillList(containerId,arr,category){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  el.innerHTML='';
+  arr.forEach((val,i)=>{
+    const pill=document.createElement('span');
+    pill.style.cssText='display:inline-flex;align-items:center;gap:4px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:12px;';
+    pill.textContent=val;
+    const del=document.createElement('button');
+    del.textContent='×';
+    del.title='Remove';
+    del.style.cssText='border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 0 0 2px;';
+    del.onclick=()=>cfgDeleteSize(category,i);
+    pill.appendChild(del);
+    el.appendChild(pill);
+  });
+}
+
+function cfgAddSize(category){
+  const inputId={metric:'cfgNewMetric',imperial:'cfgNewImperial',custom:'cfgNewCustom'}[category];
+  const inp=document.getElementById(inputId);
+  const val=(inp.value||'').trim();
+  if(!val)return;
+  if(!_cfgData)return;
+  const ts=_cfgData.thread_sizes;
+  if(!ts[category])ts[category]=[];
+  if(ts[category].includes(val)){inp.value='';return;}
+  ts[category].push(val);
+  inp.value='';
+  cfgRenderSizes();
+}
+
+function cfgDeleteSize(category,index){
+  if(!_cfgData)return;
+  _cfgData.thread_sizes[category].splice(index,1);
+  cfgRenderSizes();
+}
+
+// ── Standards ────────────────────────────────────────────────────────
+function cfgRenderStandards(){
+  if(!_cfgData)return;
+  const filter=document.getElementById('cfgStdFilter');
+  const filterVal=filter?filter.value:'';
+  const tbody=document.getElementById('cfgStdBody');
+  if(!tbody)return;
+  tbody.innerHTML='';
+  (_cfgData.standards||[]).forEach((s,i)=>{
+    if(filterVal&&s.type!==filterVal)return;
+    const tr=document.createElement('tr');
+    tr.style.borderBottom='1px solid var(--border)';
+    tr.innerHTML=`
+      <td style="padding:5px 8px;font-weight:600">${s.name}</td>
+      <td style="padding:5px 8px;color:var(--muted)">${s.type||''}</td>
+      <td style="padding:5px 8px;color:var(--muted)">${s.desc||''}</td>
+      <td style="padding:5px 4px;text-align:right">
+        <button class="btn sm" style="padding:2px 8px;font-size:11px" onclick="cfgDeleteStandard(${i})">✕</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function cfgAddStandard(){
+  const name=(document.getElementById('cfgNewStdName').value||'').trim();
+  const type=(document.getElementById('cfgNewStdType').value||'').trim();
+  const desc=(document.getElementById('cfgNewStdDesc').value||'').trim();
+  if(!name||!type)return;
+  if(!_cfgData)return;
+  if(!_cfgData.standards)_cfgData.standards=[];
+  if(_cfgData.standards.find(s=>s.name===name&&s.type===type))return;
+  _cfgData.standards.push({name,type,desc});
+  document.getElementById('cfgNewStdName').value='';
+  document.getElementById('cfgNewStdDesc').value='';
+  cfgRenderStandards();
+}
+
+function cfgDeleteStandard(index){
+  if(!_cfgData)return;
+  _cfgData.standards.splice(index,1);
+  cfgRenderStandards();
+}
+
+// ── Materials ─────────────────────────────────────────────────────────
+function cfgRenderMaterials(){
+  if(!_cfgData)return;
+  const el=document.getElementById('cfgMaterialList');
+  if(!el)return;
+  el.innerHTML='';
+  (_cfgData.materials||[]).forEach((m,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)';
+    const span=document.createElement('span');
+    span.style.flex='1';
+    span.textContent=m;
+    const del=document.createElement('button');
+    del.className='btn sm';
+    del.style.cssText='padding:2px 8px;font-size:11px';
+    del.textContent='✕';
+    del.onclick=()=>cfgDeleteMaterial(i);
+    row.appendChild(span);row.appendChild(del);
+    el.appendChild(row);
+  });
+}
+
+function cfgAddMaterial(){
+  const val=(document.getElementById('cfgNewMaterial').value||'').trim();
+  if(!val||!_cfgData)return;
+  if(!_cfgData.materials)_cfgData.materials=[];
+  if(_cfgData.materials.includes(val)){document.getElementById('cfgNewMaterial').value='';return;}
+  _cfgData.materials.push(val);
+  document.getElementById('cfgNewMaterial').value='';
+  cfgRenderMaterials();
+}
+
+function cfgDeleteMaterial(index){
+  if(!_cfgData)return;
+  _cfgData.materials.splice(index,1);
+  cfgRenderMaterials();
+}
+
+// ── Save / Reset ──────────────────────────────────────────────────────
+async function cfgSave(){
+  const st=document.getElementById('cfgStatus');
+  setStatus(st,'Saving…','loading');
+  try{
+    await apiPOST('/api/config/hardware',_cfgData);
+    _hwConfig=JSON.parse(JSON.stringify(_cfgData)); // update live copy
+    setStatus(st,'✅ Saved','ok');
+  }catch(e){setStatus(st,'❌ '+e.message,'err');}
+}
+
+async function cfgReset(){
+  if(!confirm('Reset all config to factory defaults? This cannot be undone.'))return;
+  const st=document.getElementById('cfgStatus');
+  setStatus(st,'Resetting…','loading');
+  try{
+    const data=await apiPOST('/api/config/hardware/reset',{});
+    _cfgData=JSON.parse(JSON.stringify(data));
+    _hwConfig=JSON.parse(JSON.stringify(data));
+    cfgRenderAll();
+    setStatus(st,'✅ Reset to defaults','ok');
+  }catch(e){setStatus(st,'❌ '+e.message,'err');}
 }
 </script>
 <script>

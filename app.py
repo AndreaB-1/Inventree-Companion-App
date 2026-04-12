@@ -120,6 +120,132 @@ def _resolve_label_plugin_key(api: InvenTreeAPI) -> Optional[str]:
     return None
 
 
+# ----------------------------- HW CONFIG -----------------------------
+HW_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "hw_config.json")
+
+DEFAULT_HW_CONFIG: Dict[str, Any] = {
+    "thread_sizes": {
+        "metric": [
+            "M1", "M1.2", "M1.4", "M1.6", "M2", "M2.5", "M3", "M3.5",
+            "M4", "M5", "M6", "M7", "M8", "M10", "M12", "M14", "M16",
+            "M18", "M20", "M22", "M24", "M27", "M30", "M36", "M42", "M48"
+        ],
+        "imperial": [
+            "#0-80", "#1-64", "#1-72", "#2-56", "#2-64", "#3-48", "#3-56",
+            "#4-40", "#4-48", "#5-40", "#5-44", "#6-32", "#6-40", "#8-32",
+            "#8-36", "#10-24", "#10-32", "#12-24", "#12-28",
+            "1/4\"-20", "1/4\"-28", "5/16\"-18", "5/16\"-24",
+            "3/8\"-16", "3/8\"-24", "7/16\"-14", "7/16\"-20",
+            "1/2\"-13", "1/2\"-20", "9/16\"-12", "9/16\"-18",
+            "5/8\"-11", "5/8\"-18", "3/4\"-10", "3/4\"-16",
+            "7/8\"-9", "7/8\"-14", "1\"-8", "1\"-12", "1\"-14"
+        ],
+        "custom": []
+    },
+    "standards": [
+        {"name": "DIN 912",    "type": "screw",    "desc": "Socket head cap screw (hex socket)"},
+        {"name": "ISO 4762",   "type": "screw",    "desc": "Socket head cap screw (ISO equiv. of DIN 912)"},
+        {"name": "DIN 7984",   "type": "screw",    "desc": "Low-profile socket head cap screw"},
+        {"name": "ISO 7380-1", "type": "screw",    "desc": "Button head socket screw"},
+        {"name": "ISO 7380-2", "type": "screw",    "desc": "Button head socket screw with collar"},
+        {"name": "DIN 7985",   "type": "screw",    "desc": "Cross-recessed pan head screw (Phillips)"},
+        {"name": "ISO 7045",   "type": "screw",    "desc": "Cross-recessed pan head screw (ISO)"},
+        {"name": "DIN 965",    "type": "screw",    "desc": "Cross-recessed countersunk flat head screw"},
+        {"name": "ISO 10642",  "type": "screw",    "desc": "Hexagon socket countersunk head screw"},
+        {"name": "DIN 933",    "type": "screw",    "desc": "Hexagon head screw (full thread)"},
+        {"name": "DIN 931",    "type": "screw",    "desc": "Hexagon head bolt (partial thread)"},
+        {"name": "ISO 4017",   "type": "screw",    "desc": "Hexagon head screw (ISO equiv. of DIN 933)"},
+        {"name": "DIN 7991",   "type": "screw",    "desc": "Hexagon socket countersunk head screw (flat)"},
+        {"name": "ISO 1207",   "type": "screw",    "desc": "Slotted cheese head screw"},
+        {"name": "DIN 84",     "type": "screw",    "desc": "Slotted cheese head screw (DIN)"},
+        {"name": "ISO 4032",   "type": "nut",      "desc": "Hexagon nut, style 1"},
+        {"name": "ISO 4033",   "type": "nut",      "desc": "Hexagon nut, style 2 (high)"},
+        {"name": "DIN 934",    "type": "nut",      "desc": "Hexagon nut (DIN equiv. of ISO 4032)"},
+        {"name": "DIN 985",    "type": "nut",      "desc": "Nyloc hexagon nut (nylon insert lock nut)"},
+        {"name": "ISO 7042",   "type": "nut",      "desc": "All-metal prevailing torque hexagon nut"},
+        {"name": "DIN 6923",   "type": "nut",      "desc": "Hexagon flange nut"},
+        {"name": "ISO 4161",   "type": "nut",      "desc": "Hexagon flange nut (ISO)"},
+        {"name": "DIN 1587",   "type": "nut",      "desc": "Hexagon domed cap nut"},
+        {"name": "ISO 7089",   "type": "washer",   "desc": "Plain washer, normal series"},
+        {"name": "ISO 7090",   "type": "washer",   "desc": "Plain washer with chamfer, normal series"},
+        {"name": "ISO 7093",   "type": "washer",   "desc": "Plain washer, large series"},
+        {"name": "DIN 125",    "type": "washer",   "desc": "Plain washer (DIN equiv. of ISO 7089)"},
+        {"name": "DIN 9021",   "type": "washer",   "desc": "Plain washer, large OD (DIN equiv. of ISO 7093)"},
+        {"name": "DIN 127",    "type": "washer",   "desc": "Spring lock washer"},
+        {"name": "ISO 7092",   "type": "washer",   "desc": "Plain washer, small series"},
+        {"name": "DIN 6797",   "type": "washer",   "desc": "Serrated lock washer (internal/external)"},
+        {"name": "DIN 7981",   "type": "screw",    "desc": "Cross-recessed pan head tapping screw"},
+        {"name": "DIN 7982",   "type": "screw",    "desc": "Cross-recessed countersunk tapping screw"},
+        {"name": "ISO 14585",  "type": "screw",    "desc": "Hexalobular socket pan head tapping screw"},
+        {"name": "ISO 14586",  "type": "screw",    "desc": "Hexalobular socket countersunk tapping screw"},
+        {"name": "ASME B18.3", "type": "screw",    "desc": "Socket head cap screw (imperial)"},
+        {"name": "ASME B18.2.1","type":"screw",    "desc": "Hex cap screws and hex bolts (imperial)"},
+        {"name": "ASME B18.6.3","type":"screw",    "desc": "Machine screws (imperial cross/slot)"},
+        {"name": "ASME B18.2.2","type":"nut",      "desc": "Hex nuts (imperial)"},
+        {"name": "ASME B18.22.1","type":"washer",  "desc": "Plain washers (imperial)"}
+    ],
+    "materials": [
+        "A2-304 Stainless",
+        "A4-316 Stainless",
+        "Carbon Steel",
+        "Alloy Steel",
+        "High Tensile Steel (Grade 8.8)",
+        "High Tensile Steel (Grade 10.9)",
+        "High Tensile Steel (Grade 12.9)",
+        "Zinc Plated Steel",
+        "Hot-Dip Galvanised Steel",
+        "Black Oxide Steel",
+        "Brass",
+        "Aluminium",
+        "Titanium Grade 2",
+        "Titanium Grade 5 (Ti-6Al-4V)",
+        "Nylon (PA66)",
+        "Polypropylene",
+        "PTFE"
+    ]
+}
+
+
+def _load_hw_config() -> Dict[str, Any]:
+    """Load hw_config.json; fall back to DEFAULT_HW_CONFIG if missing/corrupt."""
+    try:
+        with open(HW_CONFIG_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Merge: ensure all top-level keys exist
+        for k, v in DEFAULT_HW_CONFIG.items():
+            if k not in data:
+                data[k] = v
+        return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        return json.loads(json.dumps(DEFAULT_HW_CONFIG))  # deep copy
+
+
+def _save_hw_config(cfg: Dict[str, Any]) -> None:
+    with open(HW_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+
+@app.get("/api/config/hardware")
+def hw_config_get():
+    return _load_hw_config()
+
+
+@app.post("/api/config/hardware")
+async def hw_config_save(body: Dict[str, Any] = Body(...)):
+    """Replace the entire config object."""
+    _save_hw_config(body)
+    return {"ok": True}
+
+
+@app.post("/api/config/hardware/reset")
+def hw_config_reset():
+    """Restore factory defaults."""
+    cfg = json.loads(json.dumps(DEFAULT_HW_CONFIG))
+    _save_hw_config(cfg)
+    return cfg
+# ---------------------------------------------------------------------
+
+
 @app.get("/")
 def index():
     return FileResponse("static/index.html")
