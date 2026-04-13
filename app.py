@@ -1692,7 +1692,10 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
     text_right = (right_edge - tv_col_w - 2) if tv_col_w > 0 else right_edge
     text_w_bot = text_right - bot_content_x - 4
     if secondary and text_w_bot > 10:
-        per_line_h = (bot_h - 4) // len(secondary)
+        # available_bot: pixels from first text y to label inner edge
+        # per_line_adv: advance (including gap) allocated per line
+        available_bot = h - 3 - (mid_y + 3)
+        per_line_adv = available_bot // len(secondary)
         fs = _hw_font(11)
         for sz in [28, 24, 20, 18, 16, 14, 13, 11]:
             f = _hw_font(sz)
@@ -1700,7 +1703,8 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
             for line in secondary:
                 try:
                     bb = d.textbbox((0, 0), line, font=f)
-                    if (bb[2] - bb[0]) > text_w_bot or (bb[3] - bb[1]) > per_line_h:
+                    # Use bb[3] (full height from anchor, includes top offset) not bb[3]-bb[1]
+                    if (bb[2] - bb[0]) > text_w_bot or bb[3] > per_line_adv - 2:
                         fits = False
                         break
                 except Exception:
@@ -1712,10 +1716,7 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
         yp = mid_y + 3
         for line in secondary:
             d.text((bot_content_x + 2, yp), line, fill=0, font=fs)
-            try:
-                yp = d.textbbox((bot_content_x + 2, yp), line, font=fs)[3] + 2
-            except Exception:
-                yp += per_line_h
+            yp += per_line_adv   # fixed advance; avoids overflow from per-position textbbox
 
     return img
 
