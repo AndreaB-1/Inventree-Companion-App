@@ -1579,11 +1579,12 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
     """Generate a 12 mm tape label.
 
     Layout (left → right, top → bottom):
-      ┌──────┬──────┬─────────────────────────┐
-      │      │      │  Title  (pushed to top)  │
-      │  QR  │  SV  ├──────────────────┬───────┤
-      │      │ box  │  Line1 / Line2   │  TV   │
-      └──────┴──────┴──────────────────┴───────┘
+      ┌──────────────────────────────────────────┬──────┐
+      │  Title  (full width, x=3 to before SV)   │      │
+      ├──────┬───────────────────────────┬────── │  SV  │
+      │  QR  │  Line1/Line2/Line3        │  TV  ││ box  │
+      │(2/3) │  (auto-sized, 3 rows)     │       │      │
+      └──────┴───────────────────────────┴───────┴──────┘
     QR and diagram columns are individually toggled from the UI.
     """
     from PIL import ImageDraw as _ID
@@ -1601,71 +1602,33 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
     sv_opt   = opts.get('show_sideview', True)
     diag_opt = opts.get('show_diagram', True)
 
-    # Vertical split: smaller top section (title) + bigger bottom row (info)
-    # mid_y at ~38 % gives roughly 40 px top / 62 px bottom on 106 px tape
+    # Vertical split: ~38 % top (title) / ~62 % bottom (info rows)
     mid_y = int(h * 0.38)
+    bot_h = h - mid_y - 4   # ≈ 62 px
 
-    # Each left column is a full-height square, capped so text always has
-    # at least 1/3 of the total label width.
+    # Column width for SV (full-height square), capped at 1/3 of label width
     cell_w = min(h - 6, max(20, (w - 6) // 3))
 
-    content_x = 3   # advances rightward as columns are added
+    # QR is placed in the bottom-left at 2/3 of cell_w, capped to fit bot_h
+    qr_size = min(round(cell_w * 2 // 3), bot_h - 2)
 
-    # ── Column 1: QR code (optional) ────────────────────────────────
-    if show_qr and qr_data:
-        qr_placed = False
-        try:
-            import qrcode as _qrcode
-            qr = _qrcode.QRCode(version=None,
-                                error_correction=_qrcode.constants.ERROR_CORRECT_M,
-                                box_size=1, border=1)
-            qr.add_data(qr_data)
-            qr.make(fit=True)
-            qr_img = qr.make_image(fill_color='black', back_color='white').convert('RGB')
-            qr_img = qr_img.resize((cell_w, cell_w), Image.NEAREST)
-            img.paste(qr_img, (content_x, (h - cell_w) // 2))
-            qr_placed = True
-        except ImportError:
-            pass
-        if not qr_placed:
-            d.rectangle([content_x, 3, content_x + cell_w - 1, h - 4], outline=0, width=1)
-            d.text((content_x + 4, 6), 'QR', fill=0, font=_hw_font(9))
-        content_x += cell_w
-        d.line([(content_x, 2), (content_x, h - 3)], fill=0, width=1)
-        content_x += 3
-
-    # ── Column 2: Side view box (optional, full-height, same width as QR) ──
+    # ── SV column: far right, full height ───────────────────────────
+    right_edge = w - 3   # rightmost x available for content
     show_sv = diag_opt and sv_opt and bool(_HW_SV.get(hw_type))
     if show_sv:
-        sv_x0 = content_x
+        sv_x0 = w - 3 - cell_w
         d.rectangle([sv_x0, 3, sv_x0 + cell_w - 1, h - 4], outline=0, width=1)
         _HW_SV[hw_type](d, specs, sv_x0 + 3, 6, cell_w - 6, h - 12)
-        content_x = sv_x0 + cell_w
-        d.line([(content_x, 2), (content_x, h - 3)], fill=0, width=1)
-        content_x += 3
+        d.line([(sv_x0 - 1, 2), (sv_x0 - 1, h - 3)], fill=0, width=1)
+        right_edge = sv_x0 - 3   # content stays left of SV divider
 
-    content_w = w - content_x - 3   # remaining width for title + bottom info
+    # ── Horizontal mid divider (left edge → right_edge) ─────────────
+    d.line([(3, mid_y), (right_edge, mid_y)], fill=0, width=1)
 
-    # ── Bottom-right cell: top view ──────────────────────────────────
-    bot_h = h - mid_y - 4
-    show_tv = diag_opt and tv_opt and bool(_HW_TV.get(hw_type)) and content_w > 50
-    tv_col_w = 0
-    if show_tv:
-        tv_col_w = min(bot_h, max(28, content_w // 4))
-
-    # ── Horizontal mid divider ───────────────────────────────────────
-    d.line([(content_x - 1, mid_y), (w - 2, mid_y)], fill=0, width=1)
-
-    # Top-view rendering
-    if show_tv and tv_col_w > 0:
-        tv_x = w - 3 - tv_col_w
-        if tv_x > content_x + 10:
-            d.line([(tv_x, mid_y + 1), (tv_x, h - 3)], fill=0, width=1)
-            _HW_TV[hw_type](d, specs, tv_x + 2, mid_y + 2, tv_col_w - 4, bot_h - 3)
-
-    # ── TOP SECTION: title, pushed to very top, horizontally centred ─
+    # ── TOP SECTION: title spans full content width ──────────────────
     lines = _label_lines(hw_type, specs, opts)
-    top_avail_h = mid_y - 5   # pixels available for title text
+    content_w  = right_edge - 3         # full width available for title
+    top_avail_h = mid_y - 5
     if lines:
         f_title = _hw_font(11)
         for sz in [32, 28, 24, 20, 16, 13, 11]:
@@ -1680,15 +1643,54 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
                 break
         try:
             bb = d.textbbox((0, 0), lines[0], font=f_title)
-            tx = content_x + max(0, (content_w - (bb[2] - bb[0])) // 2)
+            tx = 3 + max(0, (content_w - (bb[2] - bb[0])) // 2)
         except Exception:
-            tx = content_x + 3
+            tx = 6
         d.text((tx, 3), lines[0], fill=0, font=f_title)
 
-    # ── BOTTOM SECTION: up to 2 lines, font auto-sized to fill height ─
-    secondary = lines[1:3]
-    text_right = (w - 3 - tv_col_w - 3) if (show_tv and tv_col_w > 0) else (w - 5)
-    text_w_bot = text_right - content_x - 4
+    # ── BOTTOM SECTION ───────────────────────────────────────────────
+    # QR: small square in the bottom-left corner
+    bot_content_x = 3
+    if show_qr and qr_data:
+        qr_placed = False
+        try:
+            import qrcode as _qrcode
+            qr = _qrcode.QRCode(version=None,
+                                error_correction=_qrcode.constants.ERROR_CORRECT_M,
+                                box_size=1, border=1)
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color='black', back_color='white').convert('RGB')
+            qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)
+            qr_y = mid_y + max(1, (bot_h - qr_size) // 2)
+            img.paste(qr_img, (3, qr_y))
+            qr_placed = True
+        except ImportError:
+            pass
+        if not qr_placed:
+            d.rectangle([3, mid_y + 1, 3 + qr_size - 1, mid_y + qr_size], outline=0, width=1)
+            d.text((5, mid_y + 3), 'QR', fill=0, font=_hw_font(9))
+        # vertical divider after QR
+        d.line([(3 + qr_size + 1, mid_y + 1), (3 + qr_size + 1, h - 3)], fill=0, width=1)
+        bot_content_x = 3 + qr_size + 3
+
+    # TV column: right side of bottom section, flush against SV (or right edge)
+    bot_content_w = right_edge - bot_content_x - 3
+    show_tv = diag_opt and tv_opt and bool(_HW_TV.get(hw_type)) and bot_content_w > 50
+    tv_col_w = 0
+    if show_tv:
+        tv_col_w = min(bot_h, max(28, bot_content_w // 4))
+        tv_x = right_edge - tv_col_w
+        if tv_x > bot_content_x + 10:
+            d.line([(tv_x - 1, mid_y + 1), (tv_x - 1, h - 3)], fill=0, width=1)
+            _HW_TV[hw_type](d, specs, tv_x + 1, mid_y + 2, tv_col_w - 2, bot_h - 3)
+        else:
+            tv_col_w = 0   # not enough space; skip TV
+
+    # Text: up to 3 spec lines, font auto-sized to fill the available height
+    secondary  = lines[1:4]
+    text_right = (right_edge - tv_col_w - 2) if tv_col_w > 0 else right_edge
+    text_w_bot = text_right - bot_content_x - 4
     if secondary and text_w_bot > 10:
         per_line_h = (bot_h - 4) // len(secondary)
         fs = _hw_font(11)
@@ -1709,9 +1711,9 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
                 break
         yp = mid_y + 3
         for line in secondary:
-            d.text((content_x + 2, yp), line, fill=0, font=fs)
+            d.text((bot_content_x + 2, yp), line, fill=0, font=fs)
             try:
-                yp = d.textbbox((content_x + 2, yp), line, font=fs)[3] + 2
+                yp = d.textbbox((bot_content_x + 2, yp), line, font=fs)[3] + 2
             except Exception:
                 yp += per_line_h
 
