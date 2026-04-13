@@ -1677,7 +1677,7 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
         # Create a temp image (bot_h wide × qr_size tall), draw horizontal text,
         # then rotate 90° CCW so text reads bottom-to-top on the label.
         txt_img = Image.new('RGB', (bot_h, qr_size), 'white')
-        txt_d = ImageDraw.Draw(txt_img)
+        txt_d = _ID.Draw(txt_img)
         chosen_f = _hw_font(9)
         for fsz in [14, 12, 11, 10, 9, 8]:
             f = _hw_font(fsz)

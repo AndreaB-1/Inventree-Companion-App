@@ -813,8 +813,16 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
           <label class="lbl-checkbox"><input type="checkbox" id="hwOptQR" onchange="hwOnQRToggle(this.checked)"> Show QR code</label>
           <div id="hwPartRefRow" style="margin-top:8px">
             <div class="field">
-              <label style="font-size:12px;color:var(--text-2)">Part ref / label text (sideways, shown when QR disabled)</label>
-              <input type="text" id="hwPartRef" placeholder="e.g. F-0042 or M4-SHC-16" style="font-size:12px">
+              <label style="font-size:12px;color:var(--text-2)">Link part for sideways text (shown when QR disabled)</label>
+              <div id="hwPartRefLinked" style="display:none;margin-bottom:6px;padding:4px 8px;background:var(--bg-2);border-radius:6px;font-size:12px">
+                <span id="hwPartRefLinkedName"></span>
+                <button onclick="hwPartRefClear()" style="float:right;background:none;border:none;cursor:pointer;color:var(--text-3);font-size:11px;padding:0">✕ Clear</button>
+              </div>
+              <div class="field dropdown" style="margin-bottom:0">
+                <input type="text" id="hwPartRefSearchInput" placeholder="Search part by name or IPN…" autocomplete="off" style="font-size:12px">
+                <div id="hwPartRefSearchList" class="dropdown-list"></div>
+              </div>
+              <div class="field-hint" style="font-size:11px">IPN (or name if no IPN) is printed sideways on the label</div>
             </div>
           </div>
           <div id="hwQRDataRow" style="display:none;margin-top:10px">
@@ -1917,6 +1925,8 @@ let _hwLabelB64=null;
 let _hwLabelsInited=false;
 let _hwQRPartId=null;       // pk of the InvenTree part linked to the QR code
 let _hwQRSectionInited=false;
+let _hwPartRefText='';      // IPN/name of part to render sideways when QR is off
+let _hwPartRefSectionInited=false;
 let _hwConfig=null;         // loaded from /api/config/hardware
 
 // ── Config helpers ────────────────────────────────────────────────────────────
@@ -2125,7 +2135,7 @@ function hwCollectOptions(){
     show_grade:document.getElementById('hwOptGrade').checked,
     show_qr:document.getElementById('hwOptQR').checked,
     qr_data:_hwQRPartId ? JSON.stringify({part:parseInt(_hwQRPartId,10)}) : '',
-    part_ref:(document.getElementById('hwPartRef')||{value:''}).value||'',
+    part_ref:_hwPartRefText||'',
     cut_margin_mm_per_side:parseFloat(document.getElementById('hwCutMargin').value)||0,
   };
 }
@@ -2223,6 +2233,32 @@ function hwOnQRToggle(checked){
   document.getElementById('hwQRDataRow').style.display=checked?'':'none';
   document.getElementById('hwPartRefRow').style.display=checked?'none':'';
   if(checked) hwInitQRSection();
+  else hwInitPartRefSection();
+}
+
+function hwInitPartRefSection(){
+  if(_hwPartRefSectionInited)return;
+  _hwPartRefSectionInited=true;
+  attachTypeahead({
+    inputEl:document.getElementById('hwPartRefSearchInput'),
+    listEl:document.getElementById('hwPartRefSearchList'),
+    onQuery:async(q)=>{
+      const res=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=10');
+      return res.map(p=>({pk:p.pk,label:p.name+(p.ipn?' ['+p.ipn+']':''),text:p.ipn||p.name}));
+    },
+    onPick:(item)=>{
+      _hwPartRefText=item.text;
+      document.getElementById('hwPartRefLinkedName').textContent=item.label;
+      document.getElementById('hwPartRefLinked').style.display='';
+      document.getElementById('hwPartRefSearchInput').value='';
+    }
+  });
+}
+
+function hwPartRefClear(){
+  _hwPartRefText='';
+  document.getElementById('hwPartRefLinked').style.display='none';
+  document.getElementById('hwPartRefSearchInput').value='';
 }
 
 function hwInitQRSection(){
