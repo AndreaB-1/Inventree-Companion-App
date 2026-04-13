@@ -1500,7 +1500,7 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         ha = {'Socket Cap': 'SHC', 'Button': 'BHC', 'Pan': 'PH', 'Countersunk': 'CSK',
               'Hex': 'HEX', 'Flange Hex': 'FHEX', 'Truss': 'TRU', 'Set Screw': 'SS',
               }.get(head, head[:3].upper() if head else '')
-        lines.append(f"{sz}{'×' + str(ln) if ln else ''}")
+        lines.append(f"{sz}{'x' + str(ln) if ln else ''}")
         ts = ha + (' ' + drive[:3].upper() if drive and drive != 'None' else '') if ha else ''
         if ts: lines.append(ts)
         mat_line()
@@ -1549,7 +1549,7 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         pa = {'Solid Cylindrical': 'DWLP', 'Roll Pin (Spring)': 'ROLL',
               'Slotted': 'SLOT'}.get(specs.get('pin_type', ''))
         tol = specs.get('tolerance', '')
-        lines.append(f"\u00d8{dia}\u00d7{ln}mm" if dia and ln else f"\u00d8{dia}mm" if dia else '')
+        lines.append(f"\u00d8{dia}x{ln}mm" if dia and ln else f"\u00d8{dia}mm" if dia else '')
         if pa: lines.append(f"{pa} PIN")
         if tol: lines.append(tol.split(' ')[0])
         mat_line()
@@ -1617,7 +1617,6 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
     show_sv = diag_opt and sv_opt and bool(_HW_SV.get(hw_type))
     if show_sv:
         sv_x0 = w - 3 - cell_w
-        d.rectangle([sv_x0, 3, sv_x0 + cell_w - 1, h - 4], outline=0, width=1)
         _HW_SV[hw_type](d, specs, sv_x0 + 3, 6, cell_w - 6, h - 12)
         d.line([(sv_x0 - 1, 2), (sv_x0 - 1, h - 3)], fill=0, width=1)
         right_edge = sv_x0 - 3   # content stays left of SV divider
@@ -1649,7 +1648,7 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
         d.text((tx, 3), lines[0], fill=0, font=f_title)
 
     # ── BOTTOM SECTION ───────────────────────────────────────────────
-    # QR: small square in the bottom-left corner
+    part_ref = (opts.get('part_ref') or '').strip()
     bot_content_x = 3
     if show_qr and qr_data:
         qr_placed = False
@@ -1671,6 +1670,28 @@ def _make_hw_label(hw_type: str, specs: dict, length_mm: float, opts: dict) -> I
             d.rectangle([3, mid_y + 1, 3 + qr_size - 1, mid_y + qr_size], outline=0, width=1)
             d.text((5, mid_y + 3), 'QR', fill=0, font=_hw_font(9))
         # vertical divider after QR
+        d.line([(3 + qr_size + 1, mid_y + 1), (3 + qr_size + 1, h - 3)], fill=0, width=1)
+        bot_content_x = 3 + qr_size + 3
+    elif part_ref:
+        # No QR: render part_ref as small sideways text in the QR column space.
+        # Create a temp image (bot_h wide × qr_size tall), draw horizontal text,
+        # then rotate 90° CCW so text reads bottom-to-top on the label.
+        txt_img = Image.new('RGB', (bot_h, qr_size), 'white')
+        txt_d = ImageDraw.Draw(txt_img)
+        chosen_f = _hw_font(9)
+        for fsz in [14, 12, 11, 10, 9, 8]:
+            f = _hw_font(fsz)
+            bb = txt_d.textbbox((0, 0), part_ref, font=f)
+            if (bb[2] - bb[0]) <= bot_h - 4 and bb[3] <= qr_size - 4:
+                chosen_f = f
+                break
+        bb = txt_d.textbbox((0, 0), part_ref, font=chosen_f)
+        tx = max(2, (bot_h - (bb[2] - bb[0])) // 2)
+        ty = max(2, (qr_size - bb[3]) // 2)
+        txt_d.text((tx, ty), part_ref, fill=0, font=chosen_f)
+        # rotate(90, expand=True): (bot_h × qr_size) → (qr_size × bot_h)
+        txt_rotated = txt_img.rotate(90, expand=True)
+        img.paste(txt_rotated, (3, mid_y))
         d.line([(3 + qr_size + 1, mid_y + 1), (3 + qr_size + 1, h - 3)], fill=0, width=1)
         bot_content_x = 3 + qr_size + 3
 
