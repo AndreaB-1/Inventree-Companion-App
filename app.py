@@ -1296,6 +1296,33 @@ def _tv_insert(d, specs, x, y, w, h):
         d.line([(lx, ly_), (lx2, ly2)], fill=0, width=2)
 
 
+def _tv_wood_screw(d, specs, x, y, w, h):
+    drive = specs.get('drive', 'Torx T20')
+    head  = specs.get('head_type', 'Countersunk')
+    cx, cy = x + w // 2, y + h // 2
+    r  = max(4, min(w, h) // 2 - 2)
+    if head == 'Hex Washer':
+        d.polygon(_hex_pts(cx, cy, r), outline=0)
+    else:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=2)
+    dr = max(2, int(r * 0.5))
+    if drive.startswith('Torx'):
+        for ang in [0, 60, 120]:
+            dx_ = dr * math.cos(math.radians(ang))
+            dy_ = dr * math.sin(math.radians(ang))
+            d.line([(cx - dx_, cy - dy_), (cx + dx_, cy + dy_)], fill=0, width=max(2, dr // 3))
+    elif drive == 'Slotted':
+        t = max(1, dr // 3)
+        d.rectangle([cx - dr, cy - t, cx + dr, cy + t], fill=0)
+    elif drive in ('Phillips', 'Pozidriv'):
+        t = max(1, dr // 3)
+        d.rectangle([cx - dr, cy - t, cx + dr, cy + t], fill=0)
+        d.rectangle([cx - t, cy - dr, cx + t, cy + dr], fill=0)
+    elif drive == 'Square':
+        sq = max(2, dr // 2)
+        d.rectangle([cx - sq, cy - sq, cx + sq, cy + sq], fill=0)
+
+
 # ── side-view renderers ────────────────────────────────────────────
 
 def _sv_screw(d, specs, x, y, w, h):
@@ -1441,15 +1468,46 @@ def _sv_insert(d, specs, x, y, w, h):
         d.line([(cx + r, ky), (cx + r + 2, ky + 2)], fill=0, width=2)
 
 
+def _sv_wood_screw(d, specs, x, y, w, h):
+    head = specs.get('head_type', 'Countersunk')
+    cx   = x + w // 2
+    hh   = max(5, int(h * 0.24))
+    sw   = max(4, int(w * 0.28))
+    hw   = min(int(sw * 2.0), w - 4)
+    sh   = h - hh - 2
+    sx1, sx2 = cx - sw // 2, cx + sw // 2
+    hx1, hx2 = cx - hw // 2, cx + hw // 2
+    shank_h  = int(sh * 0.72)
+    if head == 'Countersunk':
+        d.polygon([(hx1, y), (hx2, y), (sx2, y + hh), (sx1, y + hh)], outline=0)
+    elif head in ('Pan', 'Wafer', 'Bugle'):
+        d.arc([hx1, y, hx2, y + hh * 2], 180, 360, fill=0, width=2)
+        d.line([(hx1, y + hh), (hx2, y + hh)], fill=0, width=2)
+    elif head == 'Truss':
+        d.arc([hx1, y + hh // 2, hx2, y + hh * 2], 180, 360, fill=0, width=2)
+        d.line([(hx1, y + hh), (hx2, y + hh)], fill=0, width=2)
+    else:  # Hex Washer
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
+    d.rectangle([sx1, y + hh, sx2, y + hh + shank_h], outline=0, width=2)
+    d.polygon([(sx1, y + hh + shank_h), (sx2, y + hh + shank_h), (cx, y + h - 1)], outline=0)
+    nt   = max(2, shank_h // 7)
+    step = shank_h / nt
+    for i in range(nt):
+        ty = y + hh + i * step
+        d.line([(sx1 - 2, ty), (sx2 + 2, ty + step * 0.65)], fill=0, width=1)
+
+
 _HW_TV = {
     'screw': _tv_screw, 'nut': _tv_nut, 'washer': _tv_washer,
     'standoff': _tv_standoff, 'rivet': _tv_rivet, 'pin': _tv_pin,
     'circlip': _tv_circlip, 'insert': _tv_insert,
+    'wood_screw': _tv_wood_screw,
 }
 _HW_SV = {
     'screw': _sv_screw, 'nut': _sv_nut, 'washer': _sv_washer,
     'standoff': _sv_standoff, 'rivet': _sv_rivet, 'pin': _sv_pin,
     'circlip': _sv_circlip, 'insert': _sv_insert,
+    'wood_screw': _sv_wood_screw,
 }
 
 
@@ -1568,6 +1626,26 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         lines.append(f"{sz}{' ' + str(ln) + 'mm' if ln else ''}")
         if ia: lines.append(f"{ia} INSERT")
         mat_line()
+
+    elif hw_type == 'wood_screw':
+        dia    = specs.get('diameter_mm', '')
+        ln     = specs.get('length_mm', '')
+        head   = specs.get('head_type', '')
+        hd     = specs.get('head_diameter_mm', '')
+        drive  = specs.get('drive', '')
+        pt     = specs.get('point_type', '')
+        finish = specs.get('finish', '')
+        ha = {'Countersunk': 'CSK', 'Pan': 'PAN', 'Truss': 'TRU',
+              'Wafer': 'WAF', 'Bugle': 'BGL', 'Hex Washer': 'HEXW'}.get(head, head[:3].upper() if head else '')
+        drive_ab = drive.split()[-1] if drive.startswith('Torx T') else drive[:3].upper() if drive else ''
+        lines.append(f"{dia}x{ln}mm" if dia and ln else f"{dia}mm" if dia else '')
+        hd_part = f"Ø{hd}" if hd else ''
+        ts = ' '.join(filter(None, [ha, hd_part, drive_ab]))
+        if ts: lines.append(ts)
+        fa = {'Zinc Plated': 'ZnP', 'Cr3+ Zinc': 'Cr3+Zn', 'Hot Dip Galv': 'HDG',
+              'Stainless': 'SS', 'Black Oxide': 'BLK', 'Polymer Coated': 'PolyC'}.get(finish, finish[:6] if finish else '')
+        if sm and fa: lines.append(fa)
+        if pt and pt != 'Sharp': lines.append('TY17' if 'Type 17' in pt else pt[:4].upper())
 
     else:
         lines.append(hw_type.upper())
