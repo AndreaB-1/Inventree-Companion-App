@@ -2350,6 +2350,10 @@ function hwSuggestName(){
     const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
     return[sz,s.install_method,'Insert',s.material].filter(Boolean).join(' ');
   }
+  if(t==='wood_screw'){
+    const sz=(s.diameter_mm||'')+(s.length_mm?'×'+s.length_mm+'mm':'');
+    return[sz,s.head_type,'Wood Screw',s.finish].filter(Boolean).join(' ');
+  }
   return t.charAt(0).toUpperCase()+t.slice(1);
 }
 
@@ -2386,6 +2390,11 @@ function hwSuggestDesc(){
   if(t==='insert'){
     const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
     return[sz,s.install_method,'Thread Insert',s.material].filter(Boolean).join(' – ');
+  }
+  if(t==='wood_screw'){
+    const sz=(s.diameter_mm||'')+(s.length_mm?'×'+s.length_mm+'mm':'');
+    const hd=s.head_diameter_mm?'Ø'+s.head_diameter_mm+'mm head':'';
+    return[sz,s.head_type,s.drive,s.point_type,'Wood Screw',hd,s.finish].filter(Boolean).join(' – ');
   }
   return'';
 }
