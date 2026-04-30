@@ -358,6 +358,11 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .lbl-opts-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .lbl-checkbox{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer;user-select:none}
 .lbl-checkbox input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+.sm-stock-row{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:6px;transition:background .15s}
+.sm-stock-row:hover{background:var(--surface-2)}
+.sm-stock-row.active{border-color:var(--accent);background:var(--accent-dim)}
+.sm-loc{font-size:13px;font-weight:600;color:var(--text)}
+.sm-qty{font-size:12px;color:var(--text-2)}
 </style>
 </head>
 <body>
@@ -397,6 +402,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       <button id="nav-labels" class="nav-item" onclick="showPage('labels')">
         <span class="ni-icon">🏷️</span>
         <span class="ni-label">Label Printer</span>
+      </button>
+      <button id="nav-stockmove" class="nav-item" onclick="showPage('stockmove')">
+        <span class="ni-icon">📦</span>
+        <span class="ni-label">Move Stock</span>
       </button>
       <button id="nav-config" class="nav-item" onclick="showPage('config')">
         <span class="ni-icon">⚙️</span>
@@ -1063,6 +1072,66 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
       </div>
     </section>
 
+    <!-- ══════════════ MOVE STOCK ══════════════ -->
+    <section id="page-stockmove" class="page">
+      <div class="page-header">
+        <div class="page-icon">📦</div>
+        <div class="page-header-text">
+          <h1>Move Stock</h1>
+          <p>Transfer a stock item from its current location to a new one</p>
+        </div>
+      </div>
+
+      <!-- Step 1: Find part -->
+      <div class="card">
+        <div class="card-header"><h2>1. Find Part</h2></div>
+        <div class="field">
+          <label>Search by name or IPN</label>
+          <div class="dropdown">
+            <input type="text" id="smPartSearch" placeholder="e.g. M4 Socket Cap Screw" autocomplete="off">
+            <div class="dropdown-list" id="smPartSearchList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Select stock item -->
+      <div class="card" id="smStockCard" style="display:none">
+        <div class="card-header"><h2>2. Select Stock Item</h2></div>
+        <div id="smStockList"></div>
+      </div>
+
+      <!-- Step 3: Move to -->
+      <div class="card" id="smMoveCard" style="display:none">
+        <div class="card-header"><h2>3. Move To</h2></div>
+        <div class="grid-2" style="gap:12px">
+          <div class="field">
+            <label>Current Location</label>
+            <input type="text" id="smFromLoc" readonly style="opacity:0.65">
+          </div>
+          <div class="field">
+            <label>Quantity to Move</label>
+            <input type="number" id="smQty" min="0.001" step="any">
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <label>New Location</label>
+            <div class="dropdown">
+              <input type="text" id="smLocSearch" placeholder="Search location…" autocomplete="off">
+              <div class="dropdown-list" id="smLocSearchList"></div>
+            </div>
+            <input type="hidden" id="smLocId">
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <label>Notes (optional)</label>
+            <input type="text" id="smNotes" placeholder="e.g. Reorganising shelf B3">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn primary" onclick="smDoMove()">📦 Move Stock</button>
+          <div class="status-line" id="smStatus"></div>
+        </div>
+      </div>
+    </section>
+
   </div>
 </div>
 
@@ -1126,13 +1195,14 @@ backdrop.onclick=()=>{sidebar.classList.remove('open');backdrop.classList.remove
 
 // PAGES
 function showPage(id){
-  ['add','kiosk','search','standards','edit','labels','config'].forEach(p=>{
+  ['add','kiosk','search','standards','edit','labels','stockmove','config'].forEach(p=>{
     document.getElementById('page-'+p).classList.toggle('active',p===id);
     document.getElementById('nav-'+p).classList.toggle('active',p===id);
   });
   sidebar.classList.remove('open');backdrop.classList.remove('show');
   if(id==='search')ensureSearchInitialized();
   if(id==='labels')initLabelsPage();
+  if(id==='stockmove')initStockMovePage();
   if(id==='config')initConfigPage();
 }
 
@@ -2461,6 +2531,110 @@ async function hwNewPartImageSearch(){
     if(res.images?.length)openImgSuggestModal(res.images,_hwQRPartId);
     setStatus(st,'','ok');
   }catch(e){setStatus(st,'❌ '+e.message,'err');}
+}
+
+// ══════════════ MOVE STOCK PAGE ══════════════
+
+let _smInited=false;
+let _smSelectedStockId=null;
+let _smSelectedQty=null;
+
+function initStockMovePage(){
+  if(_smInited)return;
+  _smInited=true;
+
+  attachTypeahead({
+    inputEl:document.getElementById('smPartSearch'),
+    listEl: document.getElementById('smPartSearchList'),
+    onQuery:async q=>{
+      const rows=await apiGET('/api/parts?q='+encodeURIComponent(q)+'&limit=12');
+      return rows.map(r=>({pk:r.pk,label:(r.ipn?r.ipn+' – ':'')+r.name}));
+    },
+    onPick:({pk})=>smLoadStockItems(pk),
+  });
+
+  attachTypeahead({
+    inputEl:document.getElementById('smLocSearch'),
+    listEl: document.getElementById('smLocSearchList'),
+    onQuery:async q=>{
+      const rows=await apiGET('/api/locations?q='+encodeURIComponent(q)+'&limit=12');
+      return rows.map(r=>({pk:r.pk,label:r.path||r.name}));
+    },
+    onPick:({pk})=>document.getElementById('smLocId').value=pk,
+  });
+}
+
+async function smLoadStockItems(partId){
+  _smSelectedStockId=null;
+  _smSelectedQty=null;
+  document.getElementById('smMoveCard').style.display='none';
+  const card=document.getElementById('smStockCard');
+  const list=document.getElementById('smStockList');
+  card.style.display='';
+  list.innerHTML='<p style="color:var(--text-3);padding:8px">Loading…</p>';
+  list.__partId=partId;
+  try{
+    const rows=await apiGET('/api/stock/by-part?part_id='+partId);
+    if(!rows.length){
+      list.innerHTML='<p style="color:var(--text-3);padding:8px">No stock items found.</p>';
+      return;
+    }
+    list.innerHTML=rows.map(r=>`
+      <div class="sm-stock-row" data-pk="${r.pk}" data-qty="${r.quantity}" data-loc="${(r.location_path||r.location_name||'').replace(/"/g,'&quot;')}" onclick="smSelectStock(this)">
+        <span class="sm-loc">${r.location_path||r.location_name||'<em style="opacity:0.5">No location</em>'}</span>
+        <span class="sm-qty">Qty: ${r.quantity}${r.batch?' &nbsp;·&nbsp; Batch: '+r.batch:''}</span>
+      </div>`).join('');
+  }catch(e){
+    list.innerHTML='<p style="color:var(--err);padding:8px">'+e.message+'</p>';
+  }
+}
+
+function smSelectStock(el){
+  document.querySelectorAll('.sm-stock-row').forEach(r=>r.classList.remove('active'));
+  el.classList.add('active');
+  _smSelectedStockId=el.dataset.pk;
+  _smSelectedQty=parseFloat(el.dataset.qty);
+  document.getElementById('smFromLoc').value=el.dataset.loc||'';
+  document.getElementById('smQty').value=_smSelectedQty;
+  document.getElementById('smQty').max=_smSelectedQty;
+  document.getElementById('smLocSearch').value='';
+  document.getElementById('smLocId').value='';
+  document.getElementById('smNotes').value='';
+  setStatus(document.getElementById('smStatus'),'');
+  document.getElementById('smMoveCard').style.display='';
+}
+
+async function smDoMove(){
+  const st=document.getElementById('smStatus');
+  const qty=parseFloat(document.getElementById('smQty').value);
+  const locId=document.getElementById('smLocId').value;
+  if(!_smSelectedStockId){setStatus(st,'Select a stock item first','err');return;}
+  if(!locId){setStatus(st,'Select a destination location','err');return;}
+  if(!qty||qty<=0){setStatus(st,'Enter a valid quantity','err');return;}
+  if(qty>_smSelectedQty){setStatus(st,'Quantity exceeds available stock ('+_smSelectedQty+')','err');return;}
+  setStatus(st,'Moving…','loading');
+  try{
+    const notes=document.getElementById('smNotes').value.trim();
+    await apiPOST('/api/stock/transfer',{
+      stock_id:parseInt(_smSelectedStockId),
+      location_id:parseInt(locId),
+      quantity:qty,
+      notes:notes||undefined,
+    });
+    setStatus(st,'✅ Moved successfully','ok');
+    _smSelectedStockId=null;
+    document.getElementById('smMoveCard').style.display='none';
+    // Refresh stock list to show updated location
+    const partSearchEl=document.getElementById('smPartSearch');
+    // Re-query using last selected part (stored in smStockList's data)
+    const firstRow=document.querySelector('.sm-stock-row');
+    if(firstRow){
+      const partId=firstRow.closest('#smStockList')?.__partId;
+      if(partId)smLoadStockItems(partId);
+    }
+  }catch(e){
+    setStatus(st,'❌ '+e.message,'err');
+  }
 }
 
 // ══════════════ LABEL CONFIG PAGE ══════════════
