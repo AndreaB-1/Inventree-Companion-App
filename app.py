@@ -794,6 +794,27 @@ def stock_remove_qty(req: StockAdjustReq):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class StockTransferReq(BaseModel):
+    stock_id: int
+    location_id: int
+    quantity: float
+    notes: Optional[str] = None
+
+@app.post("/api/stock/transfer")
+def stock_transfer(req: StockTransferReq):
+    """Move a stock item (or partial qty) to a new location."""
+    try:
+        api = inv_api()
+        payload = {
+            "items": [{"pk": int(req.stock_id), "quantity": str(req.quantity), "location": int(req.location_id)}],
+            "notes": req.notes or "Moved via companion app",
+        }
+        api.post("stock/transfer/", payload)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ----------------- AI suggest endpoint (unified fastener + electronics) -----------------
 
 class AISuggestReq(BaseModel):
