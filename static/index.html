@@ -1163,11 +1163,16 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
   <div class="modal-box" style="max-width:860px;width:95vw">
     <h3 style="margin-bottom:12px">🖼 Image Search</h3>
     <!-- Query controls -->
-    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:10px 12px;background:var(--surface-2);border-radius:var(--radius-sm)">
-      <span style="font-size:12px;color:var(--text-2);font-weight:600;margin-right:2px">Search using:</span>
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--surface-2);border-radius:var(--radius-sm)">
+      <span style="font-size:12px;color:var(--text-2);font-weight:600;white-space:nowrap">Search using:</span>
       <label class="lbl-checkbox"><input type="checkbox" id="imgQryName" checked> Name</label>
       <label class="lbl-checkbox"><input type="checkbox" id="imgQryDesc" checked> Description</label>
-      <button class="btn sm" id="imgSuggestResearch" style="margin-left:auto">🔍 Search again</button>
+      <button class="btn sm" id="imgSuggestResearch">🔍 Search</button>
+    </div>
+    <!-- Custom search bar -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="imgSuggestCustomQ" placeholder="Or type a custom search query…" style="flex:1;font-size:13px">
+      <button class="btn sm" id="imgSuggestCustomSearch">🔍</button>
     </div>
     <!-- Status / error -->
     <div id="imgSuggestError" class="status-line err" style="display:none;margin-bottom:10px"></div>
@@ -1376,6 +1381,7 @@ function openImgSuggestModal(urls,partId,name,desc){
   document.getElementById('imgSuggestUse').disabled=true;
   document.getElementById('imgSuggestError').style.display='none';
   document.getElementById('imgSuggestGrid').innerHTML='';
+  document.getElementById('imgSuggestCustomQ').value='';
   _appendImgSuggestGrid(urls);
   imgSuggestModal.classList.add('show');
 }
@@ -1404,7 +1410,8 @@ function _appendImgSuggestGrid(urls){
     div.appendChild(img);
     grid.appendChild(div);
   });
-  moreBtn.style.display=urls.length>=IMG_PAGE?'':'none';
+  // Always keep Load More visible — hide only when the page came back empty
+  moreBtn.style.display='';
 }
 function _imgSuggestPick(el){
   document.querySelectorAll('.img-suggest-item').forEach(e=>e.classList.remove('selected'));
@@ -1426,10 +1433,9 @@ async function imgSuggestLoadMore(){
     document.getElementById('imgSuggestError').style.display='flex';
   }finally{loadEl.style.display='none';}
 }
-document.getElementById('imgSuggestResearch').onclick=async()=>{
-  const q=_imgSuggestCurrentQuery();
+async function _imgSuggestRunSearch(q){
   if(!q){
-    document.getElementById('imgSuggestError').textContent='Check at least one of Name or Description.';
+    document.getElementById('imgSuggestError').textContent='Enter a search query.';
     document.getElementById('imgSuggestError').style.display='flex';
     return;
   }
@@ -1450,7 +1456,19 @@ document.getElementById('imgSuggestResearch').onclick=async()=>{
   }finally{
     document.getElementById('imgSuggestLoading').style.display='none';
   }
+}
+document.getElementById('imgSuggestResearch').onclick=()=>{
+  const q=_imgSuggestCurrentQuery();
+  if(!q){
+    document.getElementById('imgSuggestError').textContent='Check at least one of Name or Description.';
+    document.getElementById('imgSuggestError').style.display='flex';
+    return;
+  }
+  _imgSuggestRunSearch(q);
 };
+const _customQEl=document.getElementById('imgSuggestCustomQ');
+document.getElementById('imgSuggestCustomSearch').onclick=()=>_imgSuggestRunSearch(_customQEl.value.trim());
+_customQEl.addEventListener('keydown',e=>{if(e.key==='Enter')_imgSuggestRunSearch(_customQEl.value.trim());});
 document.getElementById('imgSuggestSkip').onclick=closeImgSuggestModal;
 document.getElementById('imgSuggestUse').onclick=async()=>{
   const btn=document.getElementById('imgSuggestUse');
