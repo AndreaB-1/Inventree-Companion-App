@@ -1686,7 +1686,7 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
               'Wafer': 'WAF', 'Bugle': 'BGL', 'Hex Washer': 'HEXW', 'Hex': 'HEX'}.get(head, head[:3].upper() if head else '')
         drive_ab = drive.split()[-1] if drive.startswith('Torx T') else {'Nut Driver / Socket': 'NUT'}.get(drive, drive[:3].upper() if drive else '')
         lines.append(f"{dia}x{ln}mm" if dia and ln else f"{dia}mm" if dia else '')
-        hd_part = f"Ø{hd}" if hd else ''
+        hd_part = f"d{hd}" if hd else ''
         ts = ' '.join(filter(None, [ha, hd_part, drive_ab]))
         if ts: lines.append(ts)
         fa = {'Zinc Plated': 'ZnP', 'Cr3+ Zinc': 'Cr3+Zn', 'Hot Dip Galv': 'HDG',
