@@ -455,11 +455,11 @@ def part_image_search(req: ImageSearchReq):
         from ddgs import DDGS
         results = []
         with DDGS() as ddgs:
-            for r in ddgs.images(req.query, max_results=6):
+            for r in ddgs.images(req.query, max_results=18):
                 url = r.get("image") or r.get("url")
                 if url:
                     results.append(url)
-                if len(results) >= 6:
+                if len(results) >= 18:
                     break
         return {"images": results}
     except Exception as e:
