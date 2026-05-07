@@ -1326,10 +1326,12 @@ def _tv_self_tap(d, specs, x, y, w, h):
     head  = specs.get('head_type', 'Countersunk')
     cx, cy = x + w // 2, y + h // 2
     r  = max(4, min(w, h) // 2 - 2)
-    if head == 'Hex Washer':
+    if head in ('Hex', 'Hex Washer'):
         d.polygon(_hex_pts(cx, cy, r), outline=0)
     else:
         d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=0, width=2)
+    if drive == 'Nut Driver / Socket':
+        return  # hex head is its own drive — no recess to draw
     dr = max(2, int(r * 0.5))
     if drive.startswith('Torx'):
         for ang in [0, 60, 120]:
@@ -1516,8 +1518,16 @@ def _sv_self_tap(d, specs, x, y, w, h):
     elif head == 'Truss':
         d.arc([hx1, y + hh // 2, hx2, y + hh * 2], 180, 360, fill=0, width=2)
         d.line([(hx1, y + hh), (hx2, y + hh)], fill=0, width=2)
-    else:  # Hex Washer
+    elif head == 'Hex':
+        # Plain hex head — taller profile, no washer flange
+        hh = max(6, int(h * 0.32))
         d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
+        mid = y + hh // 2
+        d.line([(hx1, mid), (hx1 - 2, mid)], fill=0, width=1)
+        d.line([(hx2, mid), (hx2 + 2, mid)], fill=0, width=1)
+    else:  # Hex Washer — rect head + visible washer flange beneath
+        d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
+        d.rectangle([hx1 - 2, y + hh, hx2 + 2, y + hh + 2], fill=0)
     d.rectangle([sx1, y + hh, sx2, y + hh + shank_h], outline=0, width=2)
     d.polygon([(sx1, y + hh + shank_h), (sx2, y + hh + shank_h), (cx, y + h - 1)], outline=0)
     partial = specs.get('thread_coverage', 'Full Thread') == 'Partial Thread'
@@ -1673,8 +1683,8 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         finish = specs.get('finish', '')
         app_   = specs.get('application', '')
         ha = {'Countersunk': 'CSK', 'Pan': 'PAN', 'Truss': 'TRU',
-              'Wafer': 'WAF', 'Bugle': 'BGL', 'Hex Washer': 'HEXW'}.get(head, head[:3].upper() if head else '')
-        drive_ab = drive.split()[-1] if drive.startswith('Torx T') else drive[:3].upper() if drive else ''
+              'Wafer': 'WAF', 'Bugle': 'BGL', 'Hex Washer': 'HEXW', 'Hex': 'HEX'}.get(head, head[:3].upper() if head else '')
+        drive_ab = drive.split()[-1] if drive.startswith('Torx T') else {'Nut Driver / Socket': 'NUT'}.get(drive, drive[:3].upper() if drive else '')
         lines.append(f"{dia}x{ln}mm" if dia and ln else f"{dia}mm" if dia else '')
         hd_part = f"Ø{hd}" if hd else ''
         ts = ' '.join(filter(None, [ha, hd_part, drive_ab]))
