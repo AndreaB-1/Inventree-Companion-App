@@ -1988,13 +1988,14 @@ const HW_TYPES={
     {id:'install_method',label:'Installation',type:'select',opts:['Heat-Set (Brass)','Threaded','Self-Tapping'],def:'Heat-Set (Brass)'},
     {id:'material',label:'Material',type:'select',opts:['Brass','A2-304 Stainless','Carbon Steel'],def:'Brass'},
   ]},
-  wood_screw:{label:'Wood Screw',icon:'🪵',fields:[
+  self_tap:{label:'Self-Tapping',icon:'🔩',fields:[
+    {id:'application',label:'Application',type:'select',opts:['Wood','Plastic / Nylon','Sheet Metal','General Purpose'],def:'Wood'},
     {id:'diameter_mm',label:'Diameter (mm)',type:'select',opts:['2','2.5','3','3.5','4','4.5','5','5.5','6','7','8','10'],def:'3'},
     {id:'length_mm',label:'Length (mm)',type:'number',def:'16',min:6,max:250,step:1},
     {id:'head_type',label:'Head Type',type:'select',opts:['Countersunk','Pan','Truss','Wafer','Bugle','Hex Washer'],def:'Countersunk'},
     {id:'head_diameter_mm',label:'Head Diameter (mm)',type:'number',def:'6',min:2,max:30,step:0.5},
     {id:'drive',label:'Drive',type:'select',opts:['Torx T10','Torx T15','Torx T20','Torx T25','Torx T30','Phillips','Square','Slotted'],def:'Torx T20'},
-    {id:'point_type',label:'Point Type',type:'select',opts:['Sharp','Type 17 (Auger)','Self-Drill'],def:'Sharp'},
+    {id:'point_type',label:'Point Type',type:'select',opts:['Sharp','Type 17 (Auger)','Self-Drill (TEK)','Thread Forming','Blunt (Type B)'],def:'Sharp'},
     {id:'finish',label:'Finish',type:'select',opts:['Zinc Plated','Cr3+ Zinc','Hot Dip Galv','Stainless','Black Oxide','Polymer Coated'],def:'Zinc Plated'},
   ]},
 };
@@ -2420,9 +2421,10 @@ function hwSuggestName(){
     const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
     return[sz,s.install_method,'Insert',s.material].filter(Boolean).join(' ');
   }
-  if(t==='wood_screw'){
+  if(t==='self_tap'){
     const sz=(s.diameter_mm||'')+(s.length_mm?'×'+s.length_mm+'mm':'');
-    return[sz,s.head_type,'Wood Screw',s.finish].filter(Boolean).join(' ');
+    const app=s.application&&s.application!=='General Purpose'?s.application:'';
+    return[sz,s.head_type,app,'Self-Tapping Screw',s.finish].filter(Boolean).join(' ');
   }
   return t.charAt(0).toUpperCase()+t.slice(1);
 }
@@ -2461,10 +2463,11 @@ function hwSuggestDesc(){
     const sz=(s.thread_size||'')+(s.length_mm?' '+s.length_mm+'mm':'');
     return[sz,s.install_method,'Thread Insert',s.material].filter(Boolean).join(' – ');
   }
-  if(t==='wood_screw'){
+  if(t==='self_tap'){
     const sz=(s.diameter_mm||'')+(s.length_mm?'×'+s.length_mm+'mm':'');
     const hd=s.head_diameter_mm?'Ø'+s.head_diameter_mm+'mm head':'';
-    return[sz,s.head_type,s.drive,s.point_type,'Wood Screw',hd,s.finish].filter(Boolean).join(' – ');
+    const app=s.application&&s.application!=='General Purpose'?s.application+' ':'';
+    return[sz,s.head_type,s.drive,s.point_type,app+'Self-Tapping Screw',hd,s.finish].filter(Boolean).join(' – ');
   }
   return'';
 }
