@@ -1317,7 +1317,7 @@ def _tv_insert(d, specs, x, y, w, h):
         d.line([(lx, ly_), (lx2, ly2)], fill=0, width=2)
 
 
-def _tv_wood_screw(d, specs, x, y, w, h):
+def _tv_self_tap(d, specs, x, y, w, h):
     drive = specs.get('drive', 'Torx T20')
     head  = specs.get('head_type', 'Countersunk')
     cx, cy = x + w // 2, y + h // 2
@@ -1489,7 +1489,7 @@ def _sv_insert(d, specs, x, y, w, h):
         d.line([(cx + r, ky), (cx + r + 2, ky + 2)], fill=0, width=2)
 
 
-def _sv_wood_screw(d, specs, x, y, w, h):
+def _sv_self_tap(d, specs, x, y, w, h):
     head = specs.get('head_type', 'Countersunk')
     cx   = x + w // 2
     hh   = max(5, int(h * 0.24))
@@ -1522,13 +1522,13 @@ _HW_TV = {
     'screw': _tv_screw, 'nut': _tv_nut, 'washer': _tv_washer,
     'standoff': _tv_standoff, 'rivet': _tv_rivet, 'pin': _tv_pin,
     'circlip': _tv_circlip, 'insert': _tv_insert,
-    'wood_screw': _tv_wood_screw,
+    'self_tap': _tv_self_tap,
 }
 _HW_SV = {
     'screw': _sv_screw, 'nut': _sv_nut, 'washer': _sv_washer,
     'standoff': _sv_standoff, 'rivet': _sv_rivet, 'pin': _sv_pin,
     'circlip': _sv_circlip, 'insert': _sv_insert,
-    'wood_screw': _sv_wood_screw,
+    'self_tap': _sv_self_tap,
 }
 
 
@@ -1648,7 +1648,7 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         if ia: lines.append(f"{ia} INSERT")
         mat_line()
 
-    elif hw_type == 'wood_screw':
+    elif hw_type == 'self_tap':
         dia    = specs.get('diameter_mm', '')
         ln     = specs.get('length_mm', '')
         head   = specs.get('head_type', '')
@@ -1656,6 +1656,7 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         drive  = specs.get('drive', '')
         pt     = specs.get('point_type', '')
         finish = specs.get('finish', '')
+        app_   = specs.get('application', '')
         ha = {'Countersunk': 'CSK', 'Pan': 'PAN', 'Truss': 'TRU',
               'Wafer': 'WAF', 'Bugle': 'BGL', 'Hex Washer': 'HEXW'}.get(head, head[:3].upper() if head else '')
         drive_ab = drive.split()[-1] if drive.startswith('Torx T') else drive[:3].upper() if drive else ''
@@ -1666,7 +1667,11 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         fa = {'Zinc Plated': 'ZnP', 'Cr3+ Zinc': 'Cr3+Zn', 'Hot Dip Galv': 'HDG',
               'Stainless': 'SS', 'Black Oxide': 'BLK', 'Polymer Coated': 'PolyC'}.get(finish, finish[:6] if finish else '')
         if sm and fa: lines.append(fa)
-        if pt and pt != 'Sharp': lines.append('TY17' if 'Type 17' in pt else pt[:4].upper())
+        pt_ab = {'Type 17 (Auger)': 'TY17', 'Self-Drill (TEK)': 'TEK',
+                 'Thread Forming': 'THRF', 'Blunt (Type B)': 'TYPB'}.get(pt, '')
+        if pt_ab: lines.append(pt_ab)
+        app_ab = {'Wood': 'WOOD', 'Plastic / Nylon': 'PLAS', 'Sheet Metal': 'SHT'}.get(app_, '')
+        if app_ab: lines.append(app_ab)
 
     else:
         lines.append(hw_type.upper())
