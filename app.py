@@ -408,6 +408,7 @@ def part_image_url(pk: str):
 
 class ImageSearchReq(BaseModel):
     query: str
+    offset: int = 0
 
 class ImageDownloadReq(BaseModel):
     part_id: str
@@ -449,19 +450,22 @@ def update_part_meta(req: PartUpdateReq):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+PAGE_SIZE = 18
+
 @app.post("/api/part/image-search")
 def part_image_search(req: ImageSearchReq):
     try:
         from ddgs import DDGS
+        need = req.offset + PAGE_SIZE
         results = []
         with DDGS() as ddgs:
-            for r in ddgs.images(req.query, max_results=18):
+            for r in ddgs.images(req.query, max_results=need):
                 url = r.get("image") or r.get("url")
                 if url:
                     results.append(url)
-                if len(results) >= 18:
+                if len(results) >= need:
                     break
-        return {"images": results}
+        return {"images": results[req.offset:req.offset + PAGE_SIZE]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1370,10 +1374,15 @@ def _sv_screw(d, specs, x, y, w, h):
     else:
         d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
     d.rectangle([sx1, y + hh, sx2, y + hh + sh], outline=0, width=2)
-    nt = max(3, sh // 5)
-    step = sh / nt
+    partial = specs.get('thread_coverage', 'Full Thread') == 'Partial Thread'
+    thread_start = int(sh * 0.45) if partial else 0
+    if partial:
+        d.line([(sx1, y + hh + thread_start), (sx2, y + hh + thread_start)], fill=100, width=1)
+    threaded_h = sh - thread_start
+    nt = max(2, threaded_h // 5)
+    step = threaded_h / nt
     for i in range(nt):
-        ty = y + hh + i * step
+        ty = y + hh + thread_start + i * step
         d.line([(sx1, ty), (sx2, ty + step * 0.7)], fill=0, width=1)
 
 
@@ -1511,10 +1520,15 @@ def _sv_self_tap(d, specs, x, y, w, h):
         d.rectangle([hx1, y, hx2, y + hh], outline=0, width=2)
     d.rectangle([sx1, y + hh, sx2, y + hh + shank_h], outline=0, width=2)
     d.polygon([(sx1, y + hh + shank_h), (sx2, y + hh + shank_h), (cx, y + h - 1)], outline=0)
-    nt   = max(2, shank_h // 7)
-    step = shank_h / nt
+    partial = specs.get('thread_coverage', 'Full Thread') == 'Partial Thread'
+    thread_start = int(shank_h * 0.42) if partial else 0
+    if partial:
+        d.line([(sx1, y + hh + thread_start), (sx2, y + hh + thread_start)], fill=100, width=1)
+    threaded_h = shank_h - thread_start
+    nt   = max(2, threaded_h // 7)
+    step = threaded_h / nt
     for i in range(nt):
-        ty = y + hh + i * step
+        ty = y + hh + thread_start + i * step
         d.line([(sx1 - 2, ty), (sx2 + 2, ty + step * 0.65)], fill=0, width=1)
 
 
@@ -1584,6 +1598,7 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         if ts: lines.append(ts)
         mat_line()
         if ss and specs.get('standard'): lines.append(specs['standard'])
+        if specs.get('thread_coverage') == 'Partial Thread': lines.append('PT')
 
     elif hw_type == 'nut':
         na = {'Hex': 'HEX', 'Hex Thin/Jam': 'JAM', 'Nyloc': 'NYL', 'Flanged': 'FLG',
@@ -1672,6 +1687,7 @@ def _label_lines(hw_type: str, specs: dict, opts: dict) -> list:
         if pt_ab: lines.append(pt_ab)
         app_ab = {'Wood': 'WOOD', 'Plastic / Nylon': 'PLAS', 'Sheet Metal': 'SHT'}.get(app_, '')
         if app_ab: lines.append(app_ab)
+        if specs.get('thread_coverage') == 'Partial Thread': lines.append('PT')
 
     else:
         lines.append(hw_type.upper())

@@ -1174,6 +1174,10 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
     <div id="imgSuggestLoading" style="display:none;color:var(--text-3);font-size:13px;margin-bottom:10px">Searching…</div>
     <!-- Image grid -->
     <div id="imgSuggestGrid" class="img-suggest-grid"></div>
+    <div style="text-align:center;margin-top:10px">
+      <button class="btn sm" id="imgSuggestMore" style="display:none" onclick="imgSuggestLoadMore()">⬇ Load more</button>
+      <div id="imgSuggestMoreLoading" style="display:none;font-size:12px;color:var(--text-3)">Loading…</div>
+    </div>
     <!-- Actions -->
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn" id="imgSuggestSkip">✖ Close</button>
@@ -1351,31 +1355,56 @@ document.getElementById('modalYes').onclick=async()=>{
 // IMAGE SUGGESTION
 const imgSuggestModal=document.getElementById('imgSuggestModal');
 let _imgSuggestPartId=null,_imgSuggestName='',_imgSuggestDesc='',_imgSuggestSelected=null;
+let _imgSuggestQuery='',_imgSuggestOffset=0;
+const IMG_PAGE=18;
 
+function _imgSuggestCurrentQuery(){
+  const useName=document.getElementById('imgQryName').checked;
+  const useDesc=document.getElementById('imgQryDesc').checked;
+  const parts=[];
+  if(useName&&_imgSuggestName)parts.push(_imgSuggestName);
+  if(useDesc&&_imgSuggestDesc)parts.push(_imgSuggestDesc);
+  return parts.join(' ').trim();
+}
 function openImgSuggestModal(urls,partId,name,desc){
   _imgSuggestPartId=partId;
   _imgSuggestName=name||'';
   _imgSuggestDesc=desc||'';
   _imgSuggestSelected=null;
+  _imgSuggestOffset=0;
+  _imgSuggestQuery=[name,desc].filter(Boolean).join(' ');
   document.getElementById('imgSuggestUse').disabled=true;
   document.getElementById('imgSuggestError').style.display='none';
-  _renderImgSuggestGrid(urls);
+  document.getElementById('imgSuggestGrid').innerHTML='';
+  _appendImgSuggestGrid(urls);
   imgSuggestModal.classList.add('show');
 }
 function closeImgSuggestModal(){
   imgSuggestModal.classList.remove('show');
   document.getElementById('imgSuggestGrid').innerHTML='';
+  document.getElementById('imgSuggestMore').style.display='none';
 }
-function _renderImgSuggestGrid(urls){
+function _appendImgSuggestGrid(urls){
   const grid=document.getElementById('imgSuggestGrid');
+  const moreBtn=document.getElementById('imgSuggestMore');
   if(!urls||!urls.length){
-    grid.innerHTML='<p style="color:var(--text-3);padding:12px;grid-column:1/-1">No images found.</p>';
+    if(!grid.children.length)
+      grid.innerHTML='<p style="color:var(--text-3);padding:12px;grid-column:1/-1">No images found.</p>';
+    moreBtn.style.display='none';
     return;
   }
-  grid.innerHTML=urls.map((url,i)=>`
-    <div class="img-suggest-item" data-url="${url.replace(/"/g,'&quot;')}" onclick="_imgSuggestPick(this)">
-      <img src="${url.replace(/"/g,'&quot;')}" loading="lazy" onerror="this.closest('.img-suggest-item').style.display='none'">
-    </div>`).join('');
+  urls.forEach(url=>{
+    const div=document.createElement('div');
+    div.className='img-suggest-item';
+    div.dataset.url=url;
+    div.onclick=()=>_imgSuggestPick(div);
+    const img=document.createElement('img');
+    img.src=url;img.loading='lazy';
+    img.onerror=()=>div.style.display='none';
+    div.appendChild(img);
+    grid.appendChild(div);
+  });
+  moreBtn.style.display=urls.length>=IMG_PAGE?'':'none';
 }
 function _imgSuggestPick(el){
   document.querySelectorAll('.img-suggest-item').forEach(e=>e.classList.remove('selected'));
@@ -1383,31 +1412,38 @@ function _imgSuggestPick(el){
   _imgSuggestSelected=el.dataset.url;
   document.getElementById('imgSuggestUse').disabled=false;
 }
+async function imgSuggestLoadMore(){
+  const moreBtn=document.getElementById('imgSuggestMore');
+  const loadEl=document.getElementById('imgSuggestMoreLoading');
+  moreBtn.style.display='none';loadEl.style.display='';
+  _imgSuggestOffset+=IMG_PAGE;
+  const q=_imgSuggestQuery;
+  try{
+    const res=await apiPOST('/api/part/image-search',{query:q,offset:_imgSuggestOffset});
+    _appendImgSuggestGrid(res.images||[]);
+  }catch(e){
+    document.getElementById('imgSuggestError').textContent='❌ '+e.message;
+    document.getElementById('imgSuggestError').style.display='flex';
+  }finally{loadEl.style.display='none';}
+}
 document.getElementById('imgSuggestResearch').onclick=async()=>{
-  const useName=document.getElementById('imgQryName').checked;
-  const useDesc=document.getElementById('imgQryDesc').checked;
-  if(!useName&&!useDesc){
+  const q=_imgSuggestCurrentQuery();
+  if(!q){
     document.getElementById('imgSuggestError').textContent='Check at least one of Name or Description.';
     document.getElementById('imgSuggestError').style.display='flex';
     return;
   }
-  const parts=[];
-  if(useName&&_imgSuggestName)parts.push(_imgSuggestName);
-  if(useDesc&&_imgSuggestDesc)parts.push(_imgSuggestDesc);
-  const q=parts.join(' ').trim();
-  if(!q){
-    document.getElementById('imgSuggestError').textContent='No text available for the selected fields.';
-    document.getElementById('imgSuggestError').style.display='flex';
-    return;
-  }
+  _imgSuggestQuery=q;
+  _imgSuggestOffset=0;
   document.getElementById('imgSuggestError').style.display='none';
   document.getElementById('imgSuggestLoading').style.display='';
   document.getElementById('imgSuggestGrid').innerHTML='';
+  document.getElementById('imgSuggestMore').style.display='none';
   _imgSuggestSelected=null;
   document.getElementById('imgSuggestUse').disabled=true;
   try{
-    const res=await apiPOST('/api/part/image-search',{query:q});
-    _renderImgSuggestGrid(res.images||[]);
+    const res=await apiPOST('/api/part/image-search',{query:q,offset:0});
+    _appendImgSuggestGrid(res.images||[]);
   }catch(e){
     document.getElementById('imgSuggestError').textContent='❌ '+e.message;
     document.getElementById('imgSuggestError').style.display='flex';
@@ -1989,6 +2025,7 @@ const HW_TYPES={
     {id:'grade',label:'Grade / Class',type:'select',opts:['A2-70','A4-80','A2-50','8.8','10.9','12.9','4.8','5.8'],def:'A2-70'},
     {id:'standard',label:'Standard',type:'select',opts:['ISO 4762','DIN 912','ISO 7380','DIN 7380','ISO 10642','DIN 933','ISO 4014','ISO 1207'],def:'ISO 4762'},
     {id:'finish',label:'Finish',type:'select',opts:['Plain','Zinc Plated','Black Oxide','Nickel Plated','Hot Dip Galv','Anodized'],def:'Plain'},
+    {id:'thread_coverage',label:'Thread Coverage',type:'select',opts:['Full Thread','Partial Thread'],def:'Full Thread'},
   ]},
   nut:{label:'Nut',icon:'🔧',fields:[
     {id:'thread_size',label:'Thread Size',type:'select',opts:THREAD_SIZES,def:'M4'},
@@ -2050,6 +2087,7 @@ const HW_TYPES={
     {id:'drive',label:'Drive',type:'select',opts:['Torx T10','Torx T15','Torx T20','Torx T25','Torx T30','Phillips','Square','Slotted'],def:'Torx T20'},
     {id:'point_type',label:'Point Type',type:'select',opts:['Sharp','Type 17 (Auger)','Self-Drill (TEK)','Thread Forming','Blunt (Type B)'],def:'Sharp'},
     {id:'finish',label:'Finish',type:'select',opts:['Zinc Plated','Cr3+ Zinc','Hot Dip Galv','Stainless','Black Oxide','Polymer Coated'],def:'Zinc Plated'},
+    {id:'thread_coverage',label:'Thread Coverage',type:'select',opts:['Full Thread','Partial Thread'],def:'Full Thread'},
   ]},
 };
 
@@ -2450,7 +2488,8 @@ function hwSuggestName(){
   const s=hwCollectSpecs();
   if(t==='screw'){
     const sz=(s.thread_size||'')+(s.length_mm?'×'+s.length_mm:'');
-    return[sz,s.head_type,'Screw',s.material].filter(Boolean).join(' ');
+    const tc=s.thread_coverage==='Partial Thread'?'Partial Thread':'';
+    return[sz,s.head_type,tc,'Screw',s.material].filter(Boolean).join(' ');
   }
   if(t==='nut')  return[s.thread_size,s.nut_type,'Nut',s.material].filter(Boolean).join(' ');
   if(t==='washer')return[s.fits_size,s.washer_type,'Washer',s.material].filter(Boolean).join(' ');
@@ -2477,7 +2516,8 @@ function hwSuggestName(){
   if(t==='self_tap'){
     const sz=(s.diameter_mm||'')+(s.length_mm?'×'+s.length_mm+'mm':'');
     const app=s.application&&s.application!=='General Purpose'?s.application:'';
-    return[sz,s.head_type,app,'Self-Tapping Screw',s.finish].filter(Boolean).join(' ');
+    const tc=s.thread_coverage==='Partial Thread'?'Partial Thread':'';
+    return[sz,s.head_type,app,tc,'Self-Tapping Screw',s.finish].filter(Boolean).join(' ');
   }
   return t.charAt(0).toUpperCase()+t.slice(1);
 }
@@ -2487,7 +2527,8 @@ function hwSuggestDesc(){
   const s=hwCollectSpecs();
   if(t==='screw'){
     const sz=(s.thread_size||'')+(s.length_mm?'×'+s.length_mm:'')+(s.pitch_mm?' p'+s.pitch_mm:'');
-    return[sz,s.head_type,s.drive,'Screw',s.standard,(s.material||'')+(s.grade?' '+s.grade:'')].filter(Boolean).join(' – ');
+    const tc=s.thread_coverage==='Partial Thread'?'Partial Thread':'';
+    return[sz,s.head_type,s.drive,tc,'Screw',s.standard,(s.material||'')+(s.grade?' '+s.grade:'')].filter(Boolean).join(' – ');
   }
   if(t==='nut'){
     const sz=(s.thread_size||'')+(s.pitch_mm?' p'+s.pitch_mm:'');
@@ -2520,7 +2561,8 @@ function hwSuggestDesc(){
     const sz=(s.diameter_mm||'')+(s.length_mm?'×'+s.length_mm+'mm':'');
     const hd=s.head_diameter_mm?'Ø'+s.head_diameter_mm+'mm head':'';
     const app=s.application&&s.application!=='General Purpose'?s.application+' ':'';
-    return[sz,s.head_type,s.drive,s.point_type,app+'Self-Tapping Screw',hd,s.finish].filter(Boolean).join(' – ');
+    const tc=s.thread_coverage==='Partial Thread'?'Partial Thread':'';
+    return[sz,s.head_type,s.drive,s.point_type,tc,app+'Self-Tapping Screw',hd,s.finish].filter(Boolean).join(' – ');
   }
   return'';
 }
