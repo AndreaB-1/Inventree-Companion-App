@@ -363,6 +363,11 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 .sm-stock-row.active{border-color:var(--accent);background:var(--accent-dim)}
 .sm-loc{font-size:13px;font-weight:600;color:var(--text)}
 .sm-qty{font-size:12px;color:var(--text-2)}
+.img-suggest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-height:55vh;overflow-y:auto}
+.img-suggest-item{aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;cursor:pointer;border:2px solid transparent;transition:border-color .15s,transform .1s;background:var(--surface-2)}
+.img-suggest-item img{width:100%;height:100%;object-fit:cover;display:block}
+.img-suggest-item:hover{border-color:var(--text-3);transform:scale(1.02)}
+.img-suggest-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
 </style>
 </head>
 <body>
@@ -1155,20 +1160,24 @@ input,textarea,select,button{font-family:inherit;font-size:inherit}
 
 <!-- IMAGE SUGGESTION MODAL -->
 <div id="imgSuggestModal" class="modal-overlay" role="dialog" aria-modal="true">
-  <div class="modal-box" style="max-width:480px">
-    <h3>🖼 Image Suggestion</h3>
-    <p id="imgSuggestCounter" style="margin-bottom:12px;color:var(--text-3);font-size:12px"></p>
-    <img id="imgSuggestPreview" alt="Suggested image"
-         style="width:100%;height:260px;object-fit:contain;border-radius:var(--radius-sm);
-                background:var(--surface-2);display:block;margin-bottom:14px">
-    <div id="imgSuggestError" class="status-line err" style="display:none;margin-bottom:10px"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <button class="btn sm" id="imgSuggestPrev">&#8592; Prev</button>
-      <button class="btn sm" id="imgSuggestNext">Next &#8594;</button>
+  <div class="modal-box" style="max-width:860px;width:95vw">
+    <h3 style="margin-bottom:12px">🖼 Image Search</h3>
+    <!-- Query controls -->
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:10px 12px;background:var(--surface-2);border-radius:var(--radius-sm)">
+      <span style="font-size:12px;color:var(--text-2);font-weight:600;margin-right:2px">Search using:</span>
+      <label class="lbl-checkbox"><input type="checkbox" id="imgQryName" checked> Name</label>
+      <label class="lbl-checkbox"><input type="checkbox" id="imgQryDesc" checked> Description</label>
+      <button class="btn sm" id="imgSuggestResearch" style="margin-left:auto">🔍 Search again</button>
     </div>
-    <div class="modal-actions">
-      <button class="btn" id="imgSuggestSkip">&#9197; Skip</button>
-      <button class="btn ok" id="imgSuggestUse">&#9989; Use this image</button>
+    <!-- Status / error -->
+    <div id="imgSuggestError" class="status-line err" style="display:none;margin-bottom:10px"></div>
+    <div id="imgSuggestLoading" style="display:none;color:var(--text-3);font-size:13px;margin-bottom:10px">Searching…</div>
+    <!-- Image grid -->
+    <div id="imgSuggestGrid" class="img-suggest-grid"></div>
+    <!-- Actions -->
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn" id="imgSuggestSkip">✖ Close</button>
+      <button class="btn ok" id="imgSuggestUse" disabled>✅ Use selected image</button>
     </div>
   </div>
 </div>
@@ -1341,51 +1350,93 @@ document.getElementById('modalYes').onclick=async()=>{
 
 // IMAGE SUGGESTION
 const imgSuggestModal=document.getElementById('imgSuggestModal');
-let _imgSuggestUrls=[],_imgSuggestIdx=0,_imgSuggestPartId=null;
-function openImgSuggestModal(urls,partId){
-  _imgSuggestUrls=urls;_imgSuggestIdx=0;_imgSuggestPartId=partId;
-  _renderImgSuggest();imgSuggestModal.classList.add('show');
+let _imgSuggestPartId=null,_imgSuggestName='',_imgSuggestDesc='',_imgSuggestSelected=null;
+
+function openImgSuggestModal(urls,partId,name,desc){
+  _imgSuggestPartId=partId;
+  _imgSuggestName=name||'';
+  _imgSuggestDesc=desc||'';
+  _imgSuggestSelected=null;
+  document.getElementById('imgSuggestUse').disabled=true;
+  document.getElementById('imgSuggestError').style.display='none';
+  _renderImgSuggestGrid(urls);
+  imgSuggestModal.classList.add('show');
 }
 function closeImgSuggestModal(){
   imgSuggestModal.classList.remove('show');
-  document.getElementById('imgSuggestPreview').removeAttribute('src');
+  document.getElementById('imgSuggestGrid').innerHTML='';
 }
-function _renderImgSuggest(){
-  const total=_imgSuggestUrls.length;
-  document.getElementById('imgSuggestCounter').textContent='Image '+(_imgSuggestIdx+1)+' of '+total;
-  document.getElementById('imgSuggestError').style.display='none';
-  const preview=document.getElementById('imgSuggestPreview');
-  preview.removeAttribute('src');preview.src=_imgSuggestUrls[_imgSuggestIdx];
-  preview.onerror=()=>{
-    document.getElementById('imgSuggestError').textContent='Could not load this image. Try next.';
+function _renderImgSuggestGrid(urls){
+  const grid=document.getElementById('imgSuggestGrid');
+  if(!urls||!urls.length){
+    grid.innerHTML='<p style="color:var(--text-3);padding:12px;grid-column:1/-1">No images found.</p>';
+    return;
+  }
+  grid.innerHTML=urls.map((url,i)=>`
+    <div class="img-suggest-item" data-url="${url.replace(/"/g,'&quot;')}" onclick="_imgSuggestPick(this)">
+      <img src="${url.replace(/"/g,'&quot;')}" loading="lazy" onerror="this.closest('.img-suggest-item').style.display='none'">
+    </div>`).join('');
+}
+function _imgSuggestPick(el){
+  document.querySelectorAll('.img-suggest-item').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+  _imgSuggestSelected=el.dataset.url;
+  document.getElementById('imgSuggestUse').disabled=false;
+}
+document.getElementById('imgSuggestResearch').onclick=async()=>{
+  const useName=document.getElementById('imgQryName').checked;
+  const useDesc=document.getElementById('imgQryDesc').checked;
+  if(!useName&&!useDesc){
+    document.getElementById('imgSuggestError').textContent='Check at least one of Name or Description.';
     document.getElementById('imgSuggestError').style.display='flex';
-  };
-  document.getElementById('imgSuggestPrev').disabled=(_imgSuggestIdx===0);
-  document.getElementById('imgSuggestNext').disabled=(_imgSuggestIdx===total-1);
-}
-document.getElementById('imgSuggestPrev').onclick=()=>{if(_imgSuggestIdx>0){_imgSuggestIdx--;_renderImgSuggest();}};
-document.getElementById('imgSuggestNext').onclick=()=>{if(_imgSuggestIdx<_imgSuggestUrls.length-1){_imgSuggestIdx++;_renderImgSuggest();}};
+    return;
+  }
+  const parts=[];
+  if(useName&&_imgSuggestName)parts.push(_imgSuggestName);
+  if(useDesc&&_imgSuggestDesc)parts.push(_imgSuggestDesc);
+  const q=parts.join(' ').trim();
+  if(!q){
+    document.getElementById('imgSuggestError').textContent='No text available for the selected fields.';
+    document.getElementById('imgSuggestError').style.display='flex';
+    return;
+  }
+  document.getElementById('imgSuggestError').style.display='none';
+  document.getElementById('imgSuggestLoading').style.display='';
+  document.getElementById('imgSuggestGrid').innerHTML='';
+  _imgSuggestSelected=null;
+  document.getElementById('imgSuggestUse').disabled=true;
+  try{
+    const res=await apiPOST('/api/part/image-search',{query:q});
+    _renderImgSuggestGrid(res.images||[]);
+  }catch(e){
+    document.getElementById('imgSuggestError').textContent='❌ '+e.message;
+    document.getElementById('imgSuggestError').style.display='flex';
+  }finally{
+    document.getElementById('imgSuggestLoading').style.display='none';
+  }
+};
 document.getElementById('imgSuggestSkip').onclick=closeImgSuggestModal;
 document.getElementById('imgSuggestUse').onclick=async()=>{
   const btn=document.getElementById('imgSuggestUse');
   const errEl=document.getElementById('imgSuggestError');
+  if(!_imgSuggestSelected)return;
   btn.disabled=true;btn.textContent='Uploading…';errEl.style.display='none';
   try{
-    await apiPOST('/api/part/image-download',{part_id:String(_imgSuggestPartId),image_url:_imgSuggestUrls[_imgSuggestIdx]});
+    await apiPOST('/api/part/image-download',{part_id:String(_imgSuggestPartId),image_url:_imgSuggestSelected});
     closeImgSuggestModal();
     const ts='&_='+Date.now();
-    const _imgPk=_imgSuggestPartId;
-    selectedPartThumb.src='/api/part/image-proxy?pk='+_imgPk+ts;
-    if(document.getElementById('kioskPartId').value==_imgPk)
-      kioskThumb.src='/api/part/image-proxy?pk='+_imgPk+ts;
-    if(document.getElementById('editPartId').value==_imgPk)
-      document.getElementById('editThumb').src='/api/part/image-proxy?pk='+_imgPk+ts;
+    const pk=_imgSuggestPartId;
+    selectedPartThumb.src='/api/part/image-proxy?pk='+pk+ts;
+    if(document.getElementById('kioskPartId').value==pk)
+      kioskThumb.src='/api/part/image-proxy?pk='+pk+ts;
+    if(document.getElementById('editPartId').value==pk)
+      document.getElementById('editThumb').src='/api/part/image-proxy?pk='+pk+ts;
     setStatus('createStatus','✅ Image applied','ok');
   }catch(e){
     errEl.textContent='❌ '+e.message+' — try another image.';
     errEl.style.display='flex';
   }finally{
-    btn.disabled=false;btn.textContent='✅ Use this image';
+    btn.disabled=false;btn.textContent='✅ Use selected image';
   }
 };
 
@@ -1416,7 +1467,7 @@ document.getElementById('btnCreate').onclick=async()=>{
     // Fire-and-forget image search (non-blocking)
     const imgQuery=[name,description].filter(Boolean).join(' ');
     apiPOST('/api/part/image-search',{query:imgQuery})
-      .then(res=>{if(res.images&&res.images.length>0)openImgSuggestModal(res.images,j.pk);})
+      .then(res=>{if(res.images&&res.images.length>0)openImgSuggestModal(res.images,j.pk,name,description);})
       .catch(()=>{});
   }catch(e){setStatus('createStatus','❌ '+e.message,'err')}
 };
@@ -1691,13 +1742,15 @@ document.getElementById('btnEditSave').onclick=async()=>{
 
 document.getElementById('btnEditFindImg').onclick=async()=>{
   const pk=editPartId.value;if(!pk){setStatus('editImgSearchStatus','❌ No part selected','err');return}
-  const query=[document.getElementById('editName').value,document.getElementById('editDesc').value].filter(Boolean).join(' ');
+  const editName=document.getElementById('editName').value;
+  const editDesc=document.getElementById('editDesc').value;
+  const query=[editName,editDesc].filter(Boolean).join(' ');
   setStatus('editImgSearchStatus','Searching…','loading');
   try{
     const res=await apiPOST('/api/part/image-search',{query});
     if(!res.images||!res.images.length){setStatus('editImgSearchStatus','No images found','');return}
     setStatus('editImgSearchStatus','','');
-    openImgSuggestModal(res.images,Number(pk));
+    openImgSuggestModal(res.images,Number(pk),editName,editDesc);
   }catch(e){setStatus('editImgSearchStatus','❌ '+e.message,'err')}
 };
 
@@ -2515,7 +2568,7 @@ async function hwCreateAndLinkPart(){
       // Auto-suggest internet images (same flow as main create page)
       const q=[name,desc].filter(Boolean).join(' ');
       apiPOST('/api/part/image-search',{query:q})
-        .then(res=>{if(res.images?.length)openImgSuggestModal(res.images,j.pk);})
+        .then(res=>{if(res.images?.length)openImgSuggestModal(res.images,j.pk,name,desc);})
         .catch(()=>{});
     }
   }catch(e){setStatus(st,'❌ '+e.message,'err');}
@@ -2531,7 +2584,7 @@ async function hwNewPartImageSearch(){
   setStatus(st,'Searching…','loading');
   try{
     const res=await apiPOST('/api/part/image-search',{query:q});
-    if(res.images?.length)openImgSuggestModal(res.images,_hwQRPartId);
+    if(res.images?.length)openImgSuggestModal(res.images,_hwQRPartId,name,desc);
     setStatus(st,'','ok');
   }catch(e){setStatus(st,'❌ '+e.message,'err');}
 }
