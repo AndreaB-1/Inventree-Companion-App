@@ -5,5 +5,15 @@ services:
     environment:
       INVENTREE_URL: ${INVENTREE_URL}
       INVENTREE_TOKEN: ${INVENTREE_TOKEN}
+      INVENTREE_LABEL_PLUGIN_KEY: ${INVENTREE_LABEL_PLUGIN_KEY:-}
+      INVENTREE_LABEL_MACHINE_ID: ${INVENTREE_LABEL_MACHINE_ID:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      DATA_DIR: /data            # hardware lists (Label maker config) persist here
+    volumes:
+      - companion-data:/data
     ports:
       - "8000:8000"
+
+volumes:
+  companion-data:
