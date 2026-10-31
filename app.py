@@ -28,7 +28,12 @@ from inventree.part import Part
 # QR decode (photo)
 import numpy as np
 import cv2
-from pyzbar.pyzbar import decode as zbar_decode, ZBarSymbol
+try:
+    from pyzbar.pyzbar import decode as zbar_decode, ZBarSymbol
+except Exception as _zbar_err:  # libzbar missing -> fall back to OpenCV-only decoding
+    print(f"[WARN] pyzbar unavailable ({_zbar_err}); QR decoding will use OpenCV only")
+    zbar_decode = None
+    ZBarSymbol = None
 
 # AI
 from openai import OpenAI
@@ -74,7 +79,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static frontend
+# Serve static frontend. "no-cache" = always revalidate (cheap 304s on a LAN),
+# so phones pick up new UI versions without a hard refresh.
+@app.middleware("http")
+async def _static_revalidate(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 def _resolve_default_label_plugin_id(api: InvenTreeAPI) -> int | None:
@@ -121,7 +135,10 @@ def _resolve_label_plugin_key(api: InvenTreeAPI) -> Optional[str]:
 
 
 # ----------------------------- HW CONFIG -----------------------------
-HW_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "hw_config.json")
+# DATA_DIR lets the config survive container re-creation (mount a volume there).
+DATA_DIR = os.getenv("DATA_DIR") or os.path.dirname(os.path.abspath(__file__))
+os.makedirs(DATA_DIR, exist_ok=True)
+HW_CONFIG_PATH = os.path.join(DATA_DIR, "hw_config.json")
 
 DEFAULT_HW_CONFIG: Dict[str, Any] = {
     "thread_sizes": {
@@ -248,7 +265,19 @@ def hw_config_reset():
 
 @app.get("/")
 def index():
-    return FileResponse("static/index.html")
+    return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/app/info")
+def app_info():
+    """Basic server info for the UI (no secrets)."""
+    return {
+        "inventree_url": root_url_from_api(INVENTREE_URL),
+        "ai_enabled": bool(os.getenv("OPENAI_API_KEY")),
+        "ai_model": os.getenv("OPENAI_MODEL", "gpt-4o-mini") if os.getenv("OPENAI_API_KEY") else None,
+        "label_plugin_key": INVENTREE_LABEL_PLUGIN_KEY or None,
+        "label_machine_configured": bool(INVENTREE_LABEL_MACHINE_ID),
+    }
 
 
 @app.get("/manifest.json")
@@ -293,6 +322,40 @@ def part_by_id(pk: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _part_row(r: Dict[str, Any]) -> Dict[str, Any]:
+    in_stock = r.get("in_stock")
+    if in_stock is None:
+        in_stock = r.get("total_in_stock")
+    return {
+        "pk": r.get("pk"),
+        "name": r.get("name"),
+        "ipn": r.get("IPN"),
+        "description": r.get("description"),
+        "in_stock": in_stock,
+        "units": r.get("units") or "",
+        "has_image": bool(r.get("image") or r.get("thumbnail")),
+    }
+
+
+@app.get("/api/part/detail")
+def part_detail(pk: int):
+    """Full-ish detail for one part (name, IPN, description, stock total, image flag)."""
+    try:
+        api = inv_api()
+        p = api.get(f"part/{pk}/")
+        if not p or not p.get("pk"):
+            raise HTTPException(status_code=404, detail="Part not found")
+        row = _part_row(p)
+        cat = p.get("category_detail") or {}
+        row["category"] = cat.get("pathstring") or cat.get("name") or None
+        row["active"] = p.get("active", True)
+        return row
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/parts")
 def list_parts(q: Optional[str] = None, limit: int = 20, offset: int = 0):
     """Search parts by name/IPN (DRF 'search')."""
@@ -307,12 +370,7 @@ def list_parts(q: Optional[str] = None, limit: int = 20, offset: int = 0):
         for r in rows:
             if not isinstance(r, dict):
                 continue
-            out.append({
-                "pk": r.get("pk"),
-                "name": r.get("name"),
-                "ipn": r.get("IPN"),
-                "description": r.get("description"),
-            })
+            out.append(_part_row(r))
         return out
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -605,6 +663,8 @@ async def decode_qr(image: UploadFile = File(...)):
             return hits[0], None
 
         def try_pyzbar(img):
+            if zbar_decode is None:
+                return None
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
             gray_clahe = clahe.apply(gray)
@@ -755,6 +815,43 @@ def stock_by_part(part_id: int, limit: int = 250, offset: int = 0):
                 "serial": r.get("serial")
             })
         return out
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/stock/item")
+def stock_item(pk: int):
+    """Resolve a single stock item (used when scanning a stock-item QR code)."""
+    try:
+        api = inv_api()
+        r = api.get(f"stock/{pk}/")
+        if not r or not r.get("pk"):
+            raise HTTPException(status_code=404, detail="Stock item not found")
+        return {"pk": r.get("pk"), "part": r.get("part"), "quantity": r.get("quantity"), "location": r.get("location")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class StockCreateReq(BaseModel):
+    part_id: int
+    quantity: float
+    location_id: int
+    notes: Optional[str] = None
+
+
+@app.post("/api/stock/create")
+def stock_create(req: StockCreateReq):
+    """Create a new stock item for an existing part."""
+    try:
+        api = inv_api()
+        payload: Dict[str, Any] = {"part": req.part_id, "quantity": req.quantity, "location": req.location_id}
+        if req.notes:
+            payload["notes"] = req.notes
+        res = api.post("stock/", payload)
+        pk = res.get("pk") if isinstance(res, dict) else None
+        return {"ok": True, "pk": pk}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -982,45 +1079,6 @@ GENERAL:
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI error: {e}")
-
-@app.get("/api/part/image-url")
-def part_image_url(pk: str):
-    """
-    Return absolute URLs for image and thumbnail from InvenTree for a Part.
-    """
-    try:
-        api = inv_api()
-        p = api.get(f"part/{pk}/")
-        if not p or not p.get("pk"):
-            raise HTTPException(status_code=404, detail="Part not found")
-
-        image_path = p.get("image") or ""
-        thumb_path = p.get("thumbnail") or ""
-
-        # Build absolute base (strip trailing /api[/] from INVENTREE_URL)
-        base = INVENTREE_URL.rstrip("/")
-        if base.endswith("/api"):
-            base = base[:-4]
-        if base.endswith("/api/"):
-            base = base[:-5]
-
-        def abs_url(path: str) -> str:
-            if not path:
-                return ""
-            if path.startswith("http://") or path.startswith("https://"):
-                return path
-            # InvenTree returns "/media/..." -> join with base
-            return base.rstrip("/") + path
-
-        return {
-            "image": abs_url(image_path),
-            "thumbnail": abs_url(thumb_path),
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/part/image-proxy")
 def part_image_proxy(pk: str, thumb: bool = False):

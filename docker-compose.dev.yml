@@ -1,0 +1,37 @@
+# Local test stack: builds the image from this checkout instead of pulling from GHCR.
+#
+#   Against your real InvenTree (uses your .env):
+#     docker compose -f docker-compose.dev.yml up --build web
+#
+#   Fully offline demo with a fake InvenTree (no .env needed):
+#     docker compose -f docker-compose.dev.yml --profile mock up --build
+#
+# Then open http://<this-host>:8570
+services:
+  web:
+    build: .
+    image: inventree-companion-app:dev
+    restart: unless-stopped
+    environment:
+      INVENTREE_URL: ${INVENTREE_URL:-http://mock-inventree:8001/api/}
+      INVENTREE_TOKEN: ${INVENTREE_TOKEN:-test}
+      INVENTREE_LABEL_PLUGIN_KEY: ${INVENTREE_LABEL_PLUGIN_KEY:-}
+      INVENTREE_LABEL_MACHINE_ID: ${INVENTREE_LABEL_MACHINE_ID:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      DATA_DIR: /data
+    volumes:
+      - companion-dev-data:/data
+    ports:
+      - "8570:8000"
+
+  mock-inventree:
+    profiles: ["mock"]
+    image: inventree-companion-app:dev
+    command: ["uvicorn", "tests.mock_inventree:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      INVENTREE_URL: http://unused/api/
+      INVENTREE_TOKEN: unused
+
+volumes:
+  companion-dev-data:
